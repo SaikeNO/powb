@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace Binarization.Core;
 
 public enum Algorithm { Threshold, Niblack, Sauvola, Phansalkar, Otsu }
@@ -50,81 +48,15 @@ public static class Binarizer
     public static BinarizationResult Run(GrayImage image, Algorithm algorithm, Parameters? parameters = null)
     {
         ArgumentNullException.ThrowIfNull(image);
-        var p = parameters ?? new Parameters();
-        p.Validate(algorithm);
-        var clock = Stopwatch.StartNew();
-        var input = image.Pixels.Span;
-        var output = new byte[input.Length];
-        int? threshold = null;
-        if (algorithm is Algorithm.Threshold or Algorithm.Otsu)
+        BinarizationAlgorithm implementation = algorithm switch
         {
-            threshold = algorithm == Algorithm.Otsu ? Otsu(input) : p.Threshold;
-            for (int i = 0; i < input.Length; i++) output[i] = input[i] > threshold.Value ? (byte)255 : (byte)0;
-        }
-        else
-        {
-            int w = image.Width, h = image.Height, stride = checked(w + 1);
-            int size = checked(stride * checked(h + 1));
-            var sums = new double[size];
-            var squares = new double[size];
-            for (int y = 0; y < h; y++)
-            {
-                double row = 0, rowSquares = 0;
-                for (int x = 0; x < w; x++)
-                {
-                    double v = input[y * w + x];
-                    row += v; rowSquares += v * v;
-                    int i = (y + 1) * stride + x + 1;
-                    sums[i] = sums[i - stride] + row;
-                    squares[i] = squares[i - stride] + rowSquares;
-                }
-            }
-            int radius = p.WindowSize / 2;
-            for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-            {
-                int left = Math.Max(0, x - radius), top = Math.Max(0, y - radius);
-                int right = (int)Math.Min(w, (long)x + radius + 1), bottom = (int)Math.Min(h, (long)y + radius + 1);
-                double count = (double)(right - left) * (bottom - top);
-                double m = Rectangle(sums, stride, left, top, right, bottom) / count;
-                double s = Math.Sqrt(Math.Max(0, Rectangle(squares, stride, left, top, right, bottom) / count - m * m));
-                double t;
-                if (algorithm == Algorithm.Niblack) t = m + p.NiblackK * s;
-                else if (algorithm == Algorithm.Sauvola) t = m * (1 + p.SauvolaK * (s / p.SauvolaR - 1));
-                else
-                {
-                    m /= 255; s /= 255;
-                    t = 255 * m * (1 + p.P * Math.Exp(-p.Q * m) + p.PhansalkarK * (s / p.PhansalkarR - 1));
-                }
-                if (!double.IsFinite(t)) throw new ArgumentException("Parameters produce a nonfinite threshold. Use smaller values.");
-                output[y * w + x] = input[y * w + x] > t ? (byte)255 : (byte)0;
-            }
-        }
-        var resultImage = new GrayImage(image.Width, image.Height, output);
-        clock.Stop();
-        return new(resultImage, clock.Elapsed, threshold);
-    }
-
-    private static double Rectangle(double[] a, int stride, int l, int t, int r, int b) =>
-        a[b * stride + r] - a[t * stride + r] - a[b * stride + l] + a[t * stride + l];
-
-    private static int Otsu(ReadOnlySpan<byte> pixels)
-    {
-        var histogram = new long[256];
-        double totalSum = 0;
-        foreach (byte value in pixels) { histogram[value]++; totalSum += value; }
-        long lowerCount = 0;
-        double lowerSum = 0, bestVariance = -1;
-        int best = 0;
-        for (int t = 0; t < 256; t++)
-        {
-            lowerCount += histogram[t]; lowerSum += t * (double)histogram[t];
-            long upperCount = pixels.Length - lowerCount;
-            if (lowerCount == 0 || upperCount == 0) continue;
-            double difference = lowerSum / lowerCount - (totalSum - lowerSum) / upperCount;
-            double variance = (double)lowerCount * upperCount * difference * difference;
-            if (variance > bestVariance) { bestVariance = variance; best = t; }
-        }
-        return bestVariance < 0 ? pixels[0] : best;
+            Algorithm.Threshold => new ThresholdBinarizer(),
+            Algorithm.Niblack => new NiblackBinarizer(),
+            Algorithm.Sauvola => new SauvolaBinarizer(),
+            Algorithm.Phansalkar => new PhansalkarBinarizer(),
+            Algorithm.Otsu => new OtsuBinarizer(),
+            _ => throw new ArgumentOutOfRangeException(nameof(algorithm))
+        };
+        return implementation.Run(image, parameters);
     }
 }

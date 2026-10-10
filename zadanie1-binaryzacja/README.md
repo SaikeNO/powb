@@ -46,6 +46,10 @@ Image input is decoded through WPF codecs. Transparency is composited onto white
 
 ## Core API
 
+Each algorithm has its own class: `ThresholdBinarizer`, `NiblackBinarizer`, `SauvolaBinarizer`, `PhansalkarBinarizer`, and `OtsuBinarizer`. All inherit `BinarizationAlgorithm`, which handles validation and timing. Local methods share integral neighborhood calculations through `LocalBinarizer`; each concrete class owns its threshold formula. `Binarizer.Run` remains the enum-based entry point used by the GUI.
+
+Classes can also run directly: `new SauvolaBinarizer().Run(image, parameters)`.
+
 ```csharp
 var image = new GrayImage(width, height, grayscaleBytes);
 var result = Binarizer.Run(image, Algorithm.Sauvola,
