@@ -18,7 +18,9 @@ public class AlgorithmTests
         Assert.Equal(new byte[] { 0, 0, 0, 255, 255, 255 }, r.Image.Pixels.ToArray());
     }
     [Theory]
-    [InlineData(0)] [InlineData(73)] [InlineData(255)]
+    [InlineData(0)]
+    [InlineData(73)]
+    [InlineData(255)]
     public void OtsuConstantImage(int value)
     {
         var r = Binarizer.Run(new(1, 1, [(byte)value]), Algorithm.Otsu);
@@ -41,9 +43,15 @@ public class AlgorithmTests
         Assert.Equal(best, Binarizer.Run(new(data.Length, 1, data), Algorithm.Otsu).GlobalThreshold);
     }
     [Theory]
-    [InlineData(Algorithm.Niblack, 1)] [InlineData(Algorithm.Niblack, 3)] [InlineData(Algorithm.Niblack, 25)]
-    [InlineData(Algorithm.Sauvola, 1)] [InlineData(Algorithm.Sauvola, 3)] [InlineData(Algorithm.Sauvola, 25)]
-    [InlineData(Algorithm.Phansalkar, 1)] [InlineData(Algorithm.Phansalkar, 3)] [InlineData(Algorithm.Phansalkar, 25)]
+    [InlineData(Algorithm.Niblack, 1)]
+    [InlineData(Algorithm.Niblack, 3)]
+    [InlineData(Algorithm.Niblack, 25)]
+    [InlineData(Algorithm.Sauvola, 1)]
+    [InlineData(Algorithm.Sauvola, 3)]
+    [InlineData(Algorithm.Sauvola, 25)]
+    [InlineData(Algorithm.Phansalkar, 1)]
+    [InlineData(Algorithm.Phansalkar, 3)]
+    [InlineData(Algorithm.Phansalkar, 25)]
     public void IntegralLocalMethodsMatchNaiveReference(Algorithm algorithm, int window)
     {
         var random = new Random(1234);
@@ -56,9 +64,12 @@ public class AlgorithmTests
         Assert.Null(r.GlobalThreshold); Assert.All(r.Image.Pixels.ToArray(), v => Assert.True(v is 0 or 255));
     }
     [Theory]
-    [InlineData(Algorithm.Niblack, 0)] [InlineData(Algorithm.Niblack, 100)]
-    [InlineData(Algorithm.Sauvola, 0)] [InlineData(Algorithm.Sauvola, 100)]
-    [InlineData(Algorithm.Phansalkar, 0)] [InlineData(Algorithm.Phansalkar, 100)]
+    [InlineData(Algorithm.Niblack, 0)]
+    [InlineData(Algorithm.Niblack, 100)]
+    [InlineData(Algorithm.Sauvola, 0)]
+    [InlineData(Algorithm.Sauvola, 100)]
+    [InlineData(Algorithm.Phansalkar, 0)]
+    [InlineData(Algorithm.Phansalkar, 100)]
     public void OnePixelAndZeroVarianceMatchReference(Algorithm algorithm, int value)
     {
         var image = new GrayImage(1, 1, [(byte)value]);
@@ -96,23 +107,23 @@ public class AlgorithmTests
     {
         var data = image.Pixels.ToArray(); var output = new byte[data.Length]; int radius = p.WindowSize / 2;
         for (int y = 0; y < image.Height; y++)
-        for (int x = 0; x < image.Width; x++)
-        {
-            var local = new List<double>();
-            for (int yy = Math.Max(0, y - radius); yy <= Math.Min(image.Height - 1, y + radius); yy++)
-            for (int xx = Math.Max(0, x - radius); xx <= Math.Min(image.Width - 1, x + radius); xx++)
-                local.Add(data[yy * image.Width + xx] / (a == Algorithm.Phansalkar ? 255.0 : 1));
-            double mean = local.Average();
-            double sd = Math.Sqrt(local.Average(v => (v - mean) * (v - mean)));
-            double threshold = a switch
+            for (int x = 0; x < image.Width; x++)
             {
-                Algorithm.Niblack => mean + p.NiblackK * sd,
-                Algorithm.Sauvola => mean * (1 + p.SauvolaK * (sd / p.SauvolaR - 1)),
-                _ => mean * (1 + p.P * Math.Exp(-p.Q * mean) + p.PhansalkarK * (sd / p.PhansalkarR - 1))
-            };
-            double value = data[y * image.Width + x] / (a == Algorithm.Phansalkar ? 255.0 : 1);
-            output[y * image.Width + x] = value > threshold ? (byte)255 : (byte)0;
-        }
+                var local = new List<double>();
+                for (int yy = Math.Max(0, y - radius); yy <= Math.Min(image.Height - 1, y + radius); yy++)
+                    for (int xx = Math.Max(0, x - radius); xx <= Math.Min(image.Width - 1, x + radius); xx++)
+                        local.Add(data[yy * image.Width + xx] / (a == Algorithm.Phansalkar ? 255.0 : 1));
+                double mean = local.Average();
+                double sd = Math.Sqrt(local.Average(v => (v - mean) * (v - mean)));
+                double threshold = a switch
+                {
+                    Algorithm.Niblack => mean + p.NiblackK * sd,
+                    Algorithm.Sauvola => mean * (1 + p.SauvolaK * (sd / p.SauvolaR - 1)),
+                    _ => mean * (1 + p.P * Math.Exp(-p.Q * mean) + p.PhansalkarK * (sd / p.PhansalkarR - 1))
+                };
+                double value = data[y * image.Width + x] / (a == Algorithm.Phansalkar ? 255.0 : 1);
+                output[y * image.Width + x] = value > threshold ? (byte)255 : (byte)0;
+            }
         return output;
     }
 }

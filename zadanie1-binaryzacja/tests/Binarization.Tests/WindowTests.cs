@@ -65,6 +65,6 @@ public class WindowTests
     {
         yield return root;
         foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
-        foreach (var descendant in Descendants(child)) yield return descendant;
+            foreach (var descendant in Descendants(child)) yield return descendant;
     }
 }
