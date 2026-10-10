@@ -1,6 +1,6 @@
 # Binarization — Image Processing in Biometrics
 
-C# / .NET 10 Windows desktop assignment. All five thresholding algorithms are implemented from scratch; WPF is used only for UI and image decoding/encoding.
+C# / .NET 10 Windows desktop assignment. All five thresholding algorithms are implemented from scratch; WPF is used only for UI and image decoding/encoding. Grayscale conversion and alpha compositing belong to Core.
 
 ## Build and run
 
@@ -16,10 +16,10 @@ Projects: `Binarization.Core` (`net10.0`) contains algorithms, `Binarization.App
 
 ## Demo
 
-1. Click **Load image** and choose PNG, JPEG or BMP. Original and grayscale previews appear.
-2. Choose an algorithm, edit its visible parameters, and click **Run**. Use a decimal point for fractional values.
+1. Click **Load image** and choose PNG, JPEG or BMP. The original color preview appears. Loading only decodes the file and retains its BGRA pixels; it performs no grayscale conversion.
+2. Choose an algorithm, edit its visible parameters, and click **Run**. Processing converts the source to grayscale in Core, displays the grayscale preview, then shows the binary result. Use a decimal point for fractional values.
 3. Repeat for local methods to tune their parameters. Values remain stored when changing algorithms.
-4. Click **Compare all** to compute five labeled results with the current stored parameters. Shared window size applies to all local methods.
+4. Click **Compare all** to compute five labeled results with the current stored parameters. Shared window size applies to all local methods. Grayscale conversion runs once per processing request, shared by all five algorithms; it runs on the background task. Loading another image clears the grayscale preview and results.
 5. Select a result and click **Save selected PNG**. Export is an 8-bit grayscale PNG at the original pixel dimensions with only 0 and 255 values.
 
 Results show elapsed algorithm time and the global threshold for Threshold/Otsu. Processing runs on a background task; load/run/save/parameter controls are disabled while it runs. Editing parameters marks existing results outdated; exporting them still saves the displayed result, with an outdated notice in the status bar. Preview scaling never changes processing resolution.
@@ -45,6 +45,8 @@ Otsu builds a 256-bin histogram. For each threshold `t`, classes are `[0,t]` and
 Image input is decoded through WPF codecs. Transparency is composited onto white before `round(0.299R + 0.587G + 0.114B)` grayscale conversion (C# midpoint-to-even rounding). Processing uses an 8-bit representation; for multi-frame input, only the first frame is used.
 
 ## Core API
+
+`GrayscaleConverter.ConvertBgra32(width, height, bgra)` accepts a tightly packed BGRA32 buffer with straight (not premultiplied) alpha. It does not modify its input. It returns `GrayscaleConversion`, containing a `GrayImage` and opaque BGRA pixels for the original preview. Core handles white-background alpha compositing and luminance calculation; App handles only WPF codecs and bitmap presentation. The converter has no WPF or Windows dependency.
 
 Each algorithm has its own class: `ThresholdBinarizer`, `NiblackBinarizer`, `SauvolaBinarizer`, `PhansalkarBinarizer`, and `OtsuBinarizer`. All inherit `BinarizationAlgorithm`, which handles validation and timing. Local methods share integral neighborhood calculations through `LocalBinarizer`; each concrete class owns its threshold formula. `Binarizer.Run` remains the enum-based entry point used by the GUI.
 

@@ -25,10 +25,13 @@ public class ImageFileTests
                 string path = Path.Combine(directory, "alpha.png");
                 using (var file = File.Create(path)) png.Save(file);
                 var loaded = ImageFiles.Load(path);
-                Assert.Equal(new byte[] { 255, 76, 255, 0 }, loaded.Gray.Pixels.ToArray());
-                var binary = Binarizer.Run(loaded.Gray, Algorithm.Threshold).Image;
+                Assert.Equal(pixels, loaded.Bgra); // Loading retains color and alpha without grayscale conversion.
+                var gray = GrayscaleConverter.ConvertBgra32(loaded.Width, loaded.Height, loaded.Bgra).Gray;
+                Assert.Equal(new byte[] { 255, 76, 255, 0 }, gray.Pixels.ToArray());
+                var binary = Binarizer.Run(gray, Algorithm.Threshold).Image;
                 string output = Path.Combine(directory, "binary.png"); ImageFiles.Save(binary, output);
-                var reloaded = ImageFiles.Load(output).Gray;
+                var exported = ImageFiles.Load(output);
+                var reloaded = GrayscaleConverter.ConvertBgra32(exported.Width, exported.Height, exported.Bgra).Gray;
                 Assert.Equal(4, reloaded.Width); Assert.Equal(1, reloaded.Height);
                 Assert.Equal(binary.Pixels.ToArray(), reloaded.Pixels.ToArray());
                 foreach (BitmapEncoder encoder in new BitmapEncoder[] { new JpegBitmapEncoder(), new BmpBitmapEncoder() })
@@ -36,7 +39,8 @@ public class ImageFileTests
                     encoder.Frames.Add(BitmapFrame.Create(loaded.Original));
                     string encoded = Path.Combine(directory, encoder is JpegBitmapEncoder ? "test.jpg" : "test.bmp");
                     using (var file = File.Create(encoded)) encoder.Save(file);
-                    var decoded = ImageFiles.Load(encoded).Gray;
+                    var color = ImageFiles.Load(encoded);
+                    var decoded = GrayscaleConverter.ConvertBgra32(color.Width, color.Height, color.Bgra).Gray;
                     Assert.Equal(4, decoded.Width); Assert.Equal(1, decoded.Height);
                     foreach (Algorithm algorithm in Enum.GetValues<Algorithm>())
                         Assert.All(Binarizer.Run(decoded, algorithm).Image.Pixels.ToArray(), v => Assert.True(v is 0 or 255));

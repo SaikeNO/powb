@@ -29,7 +29,10 @@ public class WindowTests
                     Assert.False(run.IsEnabled); Assert.False(save.IsEnabled);
                     ImageFiles.Save(new GrayImage(3, 2, [0, 50, 100, 150, 200, 255]), path);
                     window.LoadImage(path); Assert.True(run.IsEnabled);
+                    var grayPreview = (Image)controls.OfType<GroupBox>().Single(b => Equals(b.Header, "Grayscale")).Content;
+                    Assert.Null(grayPreview.Source);
                     await window.Process(true);
+                    Assert.NotNull(grayPreview.Source);
                     var list = controls.OfType<ListBox>().Single();
                     Assert.Equal(5, list.Items.Count); Assert.True(save.IsEnabled);
                     Assert.All(list.Items.Cast<ListBoxItem>(), item =>
@@ -44,6 +47,10 @@ public class WindowTests
                     }
                     controls.OfType<TextBox>().First().Text = "140";
                     Assert.Contains(controls.OfType<TextBlock>(), text => text.Text.Contains("outdated"));
+                    window.LoadImage(path);
+                    Assert.Null(grayPreview.Source);
+                    Assert.Empty(list.Items.Cast<object>());
+                    Assert.False(save.IsEnabled);
                 }
                 catch (Exception ex) { failure = ex; }
                 finally { window?.Close(); if (File.Exists(path)) File.Delete(path); dispatcher.InvokeShutdown(); }

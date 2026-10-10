@@ -17,7 +17,7 @@ public partial class MainWindow : Window
     private readonly ListBox results = new();
     private readonly TextBlock status = new() { Text = "Load PNG, JPEG or BMP to begin.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 0) };
     private Button run = null!, compare = null!, save = null!;
-    private GrayImage? source;
+    private LoadedImage? source;
     private bool busy, outdated;
     private Algorithm Selected => algorithms.SelectedItem is Algorithm a ? a : Algorithm.Threshold;
 
@@ -96,8 +96,8 @@ public partial class MainWindow : Window
     }
     internal void LoadImage(string path)
     {
-        var loaded = ImageFiles.Load(path); source = loaded.Gray; original.Source = loaded.Original; grayscale.Source = ImageFiles.Preview(source);
-        results.Items.Clear(); outdated = false; UpdateButtons(); status.Text = $"{Path.GetFileName(path)} — {source.Width} × {source.Height} pixels";
+        var loaded = ImageFiles.Load(path); source = loaded; original.Source = loaded.Original; grayscale.Source = null;
+        results.Items.Clear(); outdated = false; UpdateButtons(); status.Text = $"{Path.GetFileName(path)} — {source.Width} × {source.Height} pixels — click Run or Compare all to process.";
     }
     internal async Task Process(bool all)
     {
@@ -106,7 +106,14 @@ public partial class MainWindow : Window
         {
             var jobs = (all ? Enum.GetValues<Algorithm>() : new[] { Selected }).Select(a => (Algorithm: a, Parameters: Read(a))).ToArray();
             var input = source; busy = true; actions.IsEnabled = parameters.IsEnabled = false; status.Text = "Processing…";
-            var done = await Task.Run(() => jobs.Select(j => (j.Algorithm, Result: Binarizer.Run(input, j.Algorithm, j.Parameters))).ToArray());
+            var processed = await Task.Run(() =>
+            {
+                var gray = GrayscaleConverter.ConvertBgra32(input.Width, input.Height, input.Bgra).Gray;
+                var completed = jobs.Select(j => (j.Algorithm, Result: Binarizer.Run(gray, j.Algorithm, j.Parameters))).ToArray();
+                return (Gray: gray, Results: completed);
+            });
+            grayscale.Source = ImageFiles.Preview(processed.Gray);
+            var done = processed.Results;
             results.Items.Clear();
             foreach (var item in done)
             {
