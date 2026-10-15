@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Segmentation.Core/Segmentation.Core.csproj" />
+  <Project Path="Segmentation.App/Segmentation.App.csproj" />
+  <Project Path="Segmentation.Tests/Segmentation.Tests.csproj" />
+</Solution>
