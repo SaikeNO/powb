@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Binarization.App/Binarization.App.csproj" />
+  <Project Path="Binarization.Core/Binarization.Core.csproj" />
+  <Project Path="Binarization.Tests/Binarization.Tests.csproj" />
+</Solution>
