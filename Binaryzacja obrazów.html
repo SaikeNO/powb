@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Binaryzacja obrazów</title>
+<style>
+:root{--bg:#f6f6f3;--card:#fff;--tx:#1d1d1b;--mu:#6b6b66;--ac:#2a6df4;--bd:#dcdcd6;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171716;--card:#222221;--tx:#ecece8;--mu:#9a9a94;--ac:#6b9bff;--bd:#383836;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#171716;--card:#222221;--tx:#ecece8;--mu:#9a9a94;--ac:#6b9bff;--bd:#383836;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:22px;margin:0 0 4px}
+p.sub{margin:0 0 16px;color:var(--mu)}
+.panel{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:16px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px 18px}
+label{display:block;font-size:13px;color:var(--mu)}
+label b{color:var(--tx);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--ac)}
+button,input[type=file]{font:inherit;color:var(--tx)}
+button{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:7px 14px;cursor:pointer}
+.bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+figure{margin:0;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px}
+figcaption{font-size:13px;margin-bottom:6px}
+figcaption span{color:var(--mu)}
+canvas{width:100%;height:auto;display:block;border-radius:6px;background:#888}
+</style>
+</head>
+<body>
+<main>
+<h1>Binaryzacja obrazów</h1>
+<p class="sub">Progowa, Niblack, Sauvola, Phansalkar i Otsu — wszystko liczone w przeglądarce.</p>
+
+<div class="panel">
+  <div class="bar">
+    <input type="file" id="plik" accept="image/*">
+    <button id="probka">Obraz testowy</button>
+  </div>
+  <div class="row">
+    <label>Próg (progowa): <b id="vT">128</b><input type="range" id="T" min="0" max="255" value="128"></label>
+    <label>Okno (metody lokalne): <b id="vW">25</b><input type="range" id="W" min="3" max="101" step="2" value="25"></label>
+    <label>Niblack k: <b id="vKn">-0.20</b><input type="range" id="Kn" min="-1" max="0.5" step="0.05" value="-0.2"></label>
+    <label>Sauvola k: <b id="vKs">0.50</b><input type="range" id="Ks" min="0" max="1" step="0.05" value="0.5"></label>
+    <label>Phansalkar k: <b id="vKp">0.25</b><input type="range" id="Kp" min="0" max="1" step="0.05" value="0.25"></label>
+  </div>
+</div>
+
+<div class="grid" id="grid"></div>
+</main>
+
+<script>
+const NAZWY = [["orig","Oryginał (skala szarości)"],["prog","Progowa"],["nib","Niblack"],["sau","Sauvola"],["pha","Phansalkar"],["otsu","Otsu"]];
+const cv = {}, opis = {};
+const grid = document.getElementById("grid");
+for (const [id, n] of NAZWY) {
+  const f = document.createElement("figure");
+  f.innerHTML = `<figcaption>${n} <span id="o_${id}"></span></figcaption><canvas id="c_${id}"></canvas>`;
+  grid.appendChild(f);
+  cv[id] = f.querySelector("canvas"); opis[id] = f.querySelector("span");
+}
+let szary = null, W = 0, H = 0;
+
+/* ---------- średnia i odchylenie lokalne (obrazy całkowe) ---------- */
+function meanStd(g, okno) {
+  const r = okno >> 1, S = W + 1;
+  const I1 = new Float64Array(S * (H + 1)), I2 = new Float64Array(S * (H + 1));
+  for (let y = 0; y < H; y++) {
+    let a = 0, b = 0;
+    for (let x = 0; x < W; x++) {
+      const v = g[y * W + x]; a += v; b += v * v;
+      I1[(y + 1) * S + x + 1] = I1[y * S + x + 1] + a;
+      I2[(y + 1) * S + x + 1] = I2[y * S + x + 1] + b;
+    }
+  }
+  const m = new Float64Array(W * H), s = new Float64Array(W * H);
+  for (let y = 0; y < H; y++) {
+    const y0 = Math.max(0, y - r), y1 = Math.min(H, y + r + 1);
+    for (let x = 0; x < W; x++) {
+      const x0 = Math.max(0, x - r), x1 = Math.min(W, x + r + 1);
+      const n = (x1 - x0) * (y1 - y0);
+      const s1 = I1[y1 * S + x1] - I1[y0 * S + x1] - I1[y1 * S + x0] + I1[y0 * S + x0];
+      const s2 = I2[y1 * S + x1] - I2[y0 * S + x1] - I2[y1 * S + x0] + I2[y0 * S + x0];
+      const mu = s1 / n;
+      m[y * W + x] = mu;
+      s[y * W + x] = Math.sqrt(Math.max(s2 / n - mu * mu, 0));
+    }
+  }
+  return [m, s];
+}
+
+/* ---------- metody ---------- */
+const progowa = (g, t) => g.map(v => v > t ? 255 : 0);
+
+function niblack(g, m, s, k) {
+  return g.map((v, i) => v > m[i] + k * s[i] ? 255 : 0);
+}
+function sauvola(g, m, s, k, R = 128) {
+  return g.map((v, i) => v > m[i] * (1 + k * (s[i] / R - 1)) ? 255 : 0);
+}
+function phansalkar(g, m, s, k, p = 2, q = 10, R = 0.5) {
+  // obraz i statystyki normalizowane do [0,1]
+  return g.map((v, i) => {
+    const mu = m[i] / 255, sd = s[i] / 255;
+    const T = mu * (1 + p * Math.exp(-q * mu) + k * (sd / R - 1));
+    return v / 255 > T ? 255 : 0;
+  });
+}
+function progOtsu(g) {
+  const h = new Float64Array(256);
+  for (const v of g) h[v | 0]++;
+  const N = g.length;
+  let sum = 0; for (let i = 0; i < 256; i++) sum += i * h[i];
+  let wB = 0, sB = 0, best = -1, T = 0;
+  for (let t = 0; t < 256; t++) {
+    wB += h[t]; if (!wB) continue;
+    const wF = N - wB; if (!wF) break;
+    sB += t * h[t];
+    const mB = sB / wB, mF = (sum - sB) / wF;
+    const sigma = wB * wF * (mB - mF) ** 2;      // wariancja międzyklasowa
+    if (sigma > best) { best = sigma; T = t; }
+  }
+  return T;
+}
+
+/* ---------- rysowanie ---------- */
+function rysuj(id, dane) {
+  const c = cv[id]; c.width = W; c.height = H;
+  const ctx = c.getContext("2d"), im = ctx.createImageData(W, H);
+  for (let i = 0; i < dane.length; i++) {
+    const v = dane[i]; im.data[4*i] = im.data[4*i+1] = im.data[4*i+2] = v; im.data[4*i+3] = 255;
+  }
+  ctx.putImageData(im, 0, 0);
+}
+const val = id => +document.getElementById(id).value;
+
+function przelicz() {
+  if (!szary) return;
+  const t = val("T"), okno = val("W"), kn = val("Kn"), ks = val("Ks"), kp = val("Kp");
+  for (const [id, f] of [["T", t], ["W", okno], ["Kn", kn.toFixed(2)], ["Ks", ks.toFixed(2)], ["Kp", kp.toFixed(2)]])
+    document.getElementById("v" + id).textContent = f;
+  const [m, s] = meanStd(szary, okno);
+  rysuj("orig", szary);
+  rysuj("prog", progowa(szary, t));        opis.prog.textContent = `(T = ${t})`;
+  rysuj("nib", niblack(szary, m, s, kn));
+  rysuj("sau", sauvola(szary, m, s, ks));
+  rysuj("pha", phansalkar(szary, m, s, kp));
+  const to = progOtsu(szary);
+  rysuj("otsu", progowa(szary, to));       opis.otsu.textContent = `(T = ${to})`;
+}
+let tm; const opozn = () => { clearTimeout(tm); tm = setTimeout(przelicz, 60); };
+["T","W","Kn","Ks","Kp"].forEach(id => document.getElementById(id).addEventListener("input", opozn));
+
+/* ---------- wczytywanie obrazu ---------- */
+function ustawObraz(src, w, h) {
+  const k = Math.min(1, 700 / Math.max(w, h));
+  W = Math.round(w * k); H = Math.round(h * k);
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(src, 0, 0, W, H);
+  const d = ctx.getImageData(0, 0, W, H).data;
+  szary = new Float64Array(W * H);
+  for (let i = 0; i < szary.length; i++)
+    szary[i] = 0.299 * d[4*i] + 0.587 * d[4*i+1] + 0.114 * d[4*i+2];
+  przelicz();
+}
+document.getElementById("plik").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => { ustawObraz(img, img.width, img.height); URL.revokeObjectURL(img.src); };
+  img.src = URL.createObjectURL(f);
+});
+function probka() {
+  const c = document.createElement("canvas"); c.width = 600; c.height = 360;
+  const x = c.getContext("2d");
+  const g = x.createLinearGradient(0, 0, 600, 0);       // nierównomierne oświetlenie
+  g.addColorStop(0, "#2a2a2a"); g.addColorStop(1, "#e8e8e8");
+  x.fillStyle = g; x.fillRect(0, 0, 600, 360);
+  x.fillStyle = "rgba(0,0,0,.55)"; x.font = "bold 64px sans-serif"; x.fillText("Binaryzacja", 40, 120);
+  x.font = "28px serif"; x.fillText("Niblack, Sauvola, Phansalkar, Otsu", 40, 190);
+  x.font = "20px monospace"; x.fillText("Nierównomierne oświetlenie tła pokazuje", 40, 250);
+  x.fillText("przewagę metod lokalnych nad globalnymi.", 40, 280);
+  const im = x.getImageData(0, 0, 600, 360);           // szum
+  for (let i = 0; i < im.data.length; i += 4) {
+    const n = (Math.random() - .5) * 24;
+    im.data[i] += n; im.data[i+1] += n; im.data[i+2] += n;
+  }
+  x.putImageData(im, 0, 0);
+  ustawObraz(c, 600, 360);
+}
+document.getElementById("probka").addEventListener("click", probka);
+probka();
+</script>
+</body>
+</html>

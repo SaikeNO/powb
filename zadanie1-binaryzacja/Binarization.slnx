@@ -1,9 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/Binarization.App/Binarization.App.csproj" />
-    <Project Path="src/Binarization.Core/Binarization.Core.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/Binarization.Tests/Binarization.Tests.csproj" />
-  </Folder>
-</Solution>
