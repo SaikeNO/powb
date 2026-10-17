@@ -1,189 +1,379 @@
 namespace Binarization.Core;
 
-public sealed record BinarizationSettings(int Threshold = 128, int Window = 25,
-    double NiblackK = -0.2, double SauvolaK = 0.5, double PhansalkarK = 0.25);
+public sealed record BinarizationSettings(
+    int Threshold = 128,
+    int Window = 25,
+    double NiblackK = -0.2,
+    double SauvolaK = 0.5,
+    double PhansalkarK = 0.25);
 
-public sealed record BinarizationResult(byte[] Threshold, byte[] Niblack, byte[] Sauvola,
-    byte[] Phansalkar, byte[] Otsu, int OtsuThreshold);
+public sealed record BinarizationResult(
+    byte[] Threshold,
+    byte[] Niblack,
+    byte[] Sauvola,
+    byte[] Phansalkar,
+    byte[] Otsu,
+    int OtsuThreshold);
 
 public static class Binarizer
 {
     // Retain fractional luminance for statistics and threshold comparisons.
-    public static double[] ToGrayscale(byte[] bgra)
+    public static double[] ToGrayscale(byte[] bgraPixels)
     {
-        ArgumentNullException.ThrowIfNull(bgra);
-        if (bgra.Length % 4 != 0) throw new ArgumentException("Expected BGRA pixels.", nameof(bgra));
-        var gray = new double[bgra.Length / 4];
-        for (int i = 0; i < gray.Length; i++)
+        ArgumentNullException.ThrowIfNull(bgraPixels);
+
+        if (bgraPixels.Length % 4 != 0)
         {
-            int offset = i * 4;
-            gray[i] = 0.299 * bgra[offset + 2] + 0.587 * bgra[offset + 1] + 0.114 * bgra[offset];
+            throw new ArgumentException("Expected BGRA pixels.", nameof(bgraPixels));
         }
-        return gray;
+
+        var grayscalePixels = new double[bgraPixels.Length / 4];
+
+        for (int pixelIndex = 0; pixelIndex < grayscalePixels.Length; pixelIndex++)
+        {
+            int pixelByteOffset = pixelIndex * 4;
+            grayscalePixels[pixelIndex] = 0.299 * bgraPixels[pixelByteOffset + 2]
+                + 0.587 * bgraPixels[pixelByteOffset + 1]
+                + 0.114 * bgraPixels[pixelByteOffset];
+        }
+
+        return grayscalePixels;
     }
 
-    public static BinarizationResult Process(double[] gray, int width, int height,
-        BinarizationSettings settings, CancellationToken cancellationToken = default)
+    public static BinarizationResult Process(
+        double[] grayscalePixels,
+        int imageWidth,
+        int imageHeight,
+        BinarizationSettings binarizationSettings,
+        CancellationToken cancellationToken = default)
     {
-        ValidateInput(gray, width, height, settings);
-        var statistics = BuildImageStatistics(gray, width, height, cancellationToken);
-        var (otsu, otsuThreshold) = ApplyOtsu(gray, width, statistics.Histogram, cancellationToken);
+        ValidateInput(grayscalePixels, imageWidth, imageHeight, binarizationSettings);
+
+        var imageStatistics = BuildImageStatistics(grayscalePixels, imageWidth, imageHeight, cancellationToken);
+        var (otsuPixels, otsuThreshold) = ApplyOtsu(
+            grayscalePixels, imageWidth, imageStatistics.BrightnessHistogram, cancellationToken);
 
         return new BinarizationResult(
-            ApplyThreshold(gray, width, settings.Threshold, cancellationToken),
-            ApplyNiblack(gray, width, height, settings, statistics, cancellationToken),
-            ApplySauvola(gray, width, height, settings, statistics, cancellationToken),
-            ApplyPhansalkar(gray, width, height, settings, statistics, cancellationToken),
-            otsu,
+            ApplyThreshold(
+                grayscalePixels,
+                imageWidth,
+                binarizationSettings.Threshold,
+                cancellationToken),
+            ApplyNiblack(
+                grayscalePixels,
+                imageWidth,
+                imageHeight,
+                binarizationSettings,
+                imageStatistics,
+                cancellationToken),
+            ApplySauvola(
+                grayscalePixels,
+                imageWidth,
+                imageHeight,
+                binarizationSettings,
+                imageStatistics,
+                cancellationToken),
+            ApplyPhansalkar(
+                grayscalePixels,
+                imageWidth,
+                imageHeight,
+                binarizationSettings,
+                imageStatistics,
+                cancellationToken),
+            otsuPixels,
             otsuThreshold);
     }
 
-    private static void ValidateInput(double[] gray, int width, int height, BinarizationSettings settings)
+    private static void ValidateInput(
+        double[] grayscalePixels,
+        int imageWidth,
+        int imageHeight,
+        BinarizationSettings binarizationSettings)
     {
-        ArgumentNullException.ThrowIfNull(gray);
-        ArgumentNullException.ThrowIfNull(settings);
-        if (width <= 0 || height <= 0 || (long)width * height != gray.Length)
+        ArgumentNullException.ThrowIfNull(grayscalePixels);
+        ArgumentNullException.ThrowIfNull(binarizationSettings);
+
+        if (imageWidth <= 0
+            || imageHeight <= 0
+            || (long)imageWidth * imageHeight != grayscalePixels.Length)
+        {
             throw new ArgumentException("Dimensions must match a nonempty image.");
+        }
 
-        ValidateSettings(settings);
+        ValidateSettings(binarizationSettings);
     }
 
-    private static void ValidateSettings(BinarizationSettings settings)
+    private static void ValidateSettings(BinarizationSettings binarizationSettings)
     {
-        if (settings.Threshold is < 0 or > 255 || settings.Window is < 3 or > 101 || settings.Window % 2 == 0
-            || !double.IsFinite(settings.NiblackK) || settings.NiblackK is < -1 or > 0.5
-            || !double.IsFinite(settings.SauvolaK) || settings.SauvolaK is < 0 or > 1
-            || !double.IsFinite(settings.PhansalkarK) || settings.PhansalkarK is < 0 or > 1)
-            throw new ArgumentOutOfRangeException(nameof(settings));
+        if (binarizationSettings.Threshold is < 0 or > 255
+            || binarizationSettings.Window is < 3 or > 101 || binarizationSettings.Window % 2 == 0
+            || !double.IsFinite(binarizationSettings.NiblackK) || binarizationSettings.NiblackK is < -1 or > 0.5
+            || !double.IsFinite(binarizationSettings.SauvolaK) || binarizationSettings.SauvolaK is < 0 or > 1
+            || !double.IsFinite(binarizationSettings.PhansalkarK) || binarizationSettings.PhansalkarK is < 0 or > 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(binarizationSettings));
+        }
     }
 
-    private static ImageStatistics BuildImageStatistics(double[] gray, int width, int height,
+    private static ImageStatistics BuildImageStatistics(
+        double[] grayscalePixels,
+        int imageWidth,
+        int imageHeight,
         CancellationToken cancellationToken)
     {
-        int stride = checked(width + 1);
-        var sums = new double[checked(stride * (height + 1))];
-        var squares = new double[sums.Length];
-        var histogram = new int[256];
-        for (int y = 0; y < height; y++)
+        int integralTableWidth = checked(imageWidth + 1);
+        var brightnessSumTable = new double[checked(integralTableWidth * (imageHeight + 1))];
+        var squaredBrightnessSumTable = new double[brightnessSumTable.Length];
+        var brightnessHistogram = new int[256];
+
+        for (int pixelRow = 0; pixelRow < imageHeight; pixelRow++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            int rowOffset = y * width;
-            int integralRowOffset = (y + 1) * stride;
-            double rowSum = 0, rowSquareSum = 0;
-            for (int x = 0; x < width; x++)
+
+            int imageRowStartIndex = pixelRow * imageWidth;
+            int integralRowStartIndex = (pixelRow + 1) * integralTableWidth;
+            double rowBrightnessSum = 0;
+            double rowSquaredBrightnessSum = 0;
+
+            for (int pixelColumn = 0; pixelColumn < imageWidth; pixelColumn++)
             {
-                double value = gray[rowOffset + x];
-                if (!double.IsFinite(value) || value is < 0 or > 255)
-                    throw new ArgumentException("Grayscale values must be between 0 and 255.", nameof(gray));
-                histogram[(int)value]++;
-                rowSum += value;
-                rowSquareSum += value * value;
-                int index = integralRowOffset + x + 1;
-                sums[index] = sums[index - stride] + rowSum;
-                squares[index] = squares[index - stride] + rowSquareSum;
+                double pixelBrightness = grayscalePixels[imageRowStartIndex + pixelColumn];
+
+                if (!double.IsFinite(pixelBrightness) || pixelBrightness is < 0 or > 255)
+                {
+                    throw new ArgumentException(
+                        "Grayscale values must be between 0 and 255.",
+                        nameof(grayscalePixels));
+                }
+
+                brightnessHistogram[(int)pixelBrightness]++;
+                rowBrightnessSum += pixelBrightness;
+                rowSquaredBrightnessSum += pixelBrightness * pixelBrightness;
+
+                int integralTableIndex = integralRowStartIndex + pixelColumn + 1;
+                brightnessSumTable[integralTableIndex] =
+                    brightnessSumTable[integralTableIndex - integralTableWidth] + rowBrightnessSum;
+                squaredBrightnessSumTable[integralTableIndex] =
+                    squaredBrightnessSumTable[integralTableIndex - integralTableWidth] + rowSquaredBrightnessSum;
             }
         }
 
-        return new ImageStatistics(sums, squares, histogram, stride);
+        return new ImageStatistics(
+            brightnessSumTable,
+            squaredBrightnessSumTable,
+            brightnessHistogram,
+            integralTableWidth);
     }
 
-    private static byte[] ApplyThreshold(double[] gray, int width, double threshold,
+    private static byte[] ApplyThreshold(
+        double[] grayscalePixels,
+        int imageWidth,
+        double threshold,
         CancellationToken cancellationToken)
     {
-        var result = new byte[gray.Length];
-        for (int rowOffset = 0; rowOffset < gray.Length; rowOffset += width)
+        var binaryPixels = new byte[grayscalePixels.Length];
+
+        for (int imageRowStartIndex = 0;
+             imageRowStartIndex < grayscalePixels.Length;
+             imageRowStartIndex += imageWidth)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            for (int x = 0; x < width; x++)
+
+            for (int pixelColumn = 0; pixelColumn < imageWidth; pixelColumn++)
             {
-                int index = rowOffset + x;
-                result[index] = Binary(gray[index], threshold);
+                int pixelIndex = imageRowStartIndex + pixelColumn;
+                binaryPixels[pixelIndex] = Binary(grayscalePixels[pixelIndex], threshold);
             }
         }
-        return result;
+
+        return binaryPixels;
     }
 
-    private static byte[] ApplyNiblack(double[] gray, int width, int height,
-        BinarizationSettings settings, ImageStatistics statistics, CancellationToken cancellationToken) =>
-        ApplyLocalThreshold(gray, width, height, settings.Window, statistics,
-            (mean, std) => mean + settings.NiblackK * std,
+    private static byte[] ApplyNiblack(
+        double[] grayscalePixels,
+        int imageWidth,
+        int imageHeight,
+        BinarizationSettings binarizationSettings,
+        ImageStatistics imageStatistics,
+        CancellationToken cancellationToken) =>
+        ApplyLocalThreshold(
+            grayscalePixels,
+            imageWidth,
+            imageHeight,
+            binarizationSettings.Window,
+            imageStatistics,
+            (localMeanBrightness, localStandardDeviation) =>
+                localMeanBrightness + binarizationSettings.NiblackK * localStandardDeviation,
             cancellationToken);
 
-    private static byte[] ApplySauvola(double[] gray, int width, int height,
-        BinarizationSettings settings, ImageStatistics statistics, CancellationToken cancellationToken) =>
-        ApplyLocalThreshold(gray, width, height, settings.Window, statistics,
-            (mean, std) => mean * (1 + settings.SauvolaK * (std / 128 - 1)),
+    private static byte[] ApplySauvola(
+        double[] grayscalePixels,
+        int imageWidth,
+        int imageHeight,
+        BinarizationSettings binarizationSettings,
+        ImageStatistics imageStatistics,
+        CancellationToken cancellationToken) =>
+        ApplyLocalThreshold(
+            grayscalePixels,
+            imageWidth,
+            imageHeight,
+            binarizationSettings.Window,
+            imageStatistics,
+            (localMeanBrightness, localStandardDeviation) =>
+                localMeanBrightness * (1 + binarizationSettings.SauvolaK * (localStandardDeviation / 128 - 1)),
             cancellationToken);
 
-    private static byte[] ApplyPhansalkar(double[] gray, int width, int height,
-        BinarizationSettings settings, ImageStatistics statistics, CancellationToken cancellationToken) =>
-        ApplyLocalThreshold(gray, width, height, settings.Window, statistics,
-            (mean, std) =>
+    private static byte[] ApplyPhansalkar(
+        double[] grayscalePixels,
+        int imageWidth,
+        int imageHeight,
+        BinarizationSettings binarizationSettings,
+        ImageStatistics imageStatistics,
+        CancellationToken cancellationToken) =>
+        ApplyLocalThreshold(
+            grayscalePixels,
+            imageWidth,
+            imageHeight,
+            binarizationSettings.Window,
+            imageStatistics,
+            (localMeanBrightness, localStandardDeviation) =>
             {
-                double normalizedMean = mean / 255;
-                return normalizedMean * (1 + 2 * Math.Exp(-10 * normalizedMean)
-                    + settings.PhansalkarK * (std / 127.5 - 1));
+                double normalizedLocalMeanBrightness = localMeanBrightness / 255;
+                return normalizedLocalMeanBrightness * (1 + 2 * Math.Exp(-10 * normalizedLocalMeanBrightness)
+                    + binarizationSettings.PhansalkarK * (localStandardDeviation / 127.5 - 1));
             },
-            cancellationToken, normalize: true);
+            cancellationToken,
+            normalizePixelBrightness: true);
 
-    private static (byte[] Pixels, int Threshold) ApplyOtsu(double[] gray, int width,
-        int[] histogram, CancellationToken cancellationToken)
+    private static (byte[] Pixels, int Threshold) ApplyOtsu(
+        double[] grayscalePixels,
+        int imageWidth,
+        int[] brightnessHistogram,
+        CancellationToken cancellationToken)
     {
-        int threshold = FindOtsuThreshold(histogram, gray.Length);
-        return (ApplyThreshold(gray, width, threshold, cancellationToken), threshold);
+        int threshold = FindOtsuThreshold(brightnessHistogram, grayscalePixels.Length);
+        return (ApplyThreshold(grayscalePixels, imageWidth, threshold, cancellationToken), threshold);
     }
 
-    private static byte[] ApplyLocalThreshold(double[] gray, int width, int height, int window,
-        ImageStatistics statistics, Func<double, double, double> calculateThreshold,
-        CancellationToken cancellationToken, bool normalize = false)
+    private static byte[] ApplyLocalThreshold(
+        double[] grayscalePixels,
+        int imageWidth,
+        int imageHeight,
+        int windowSize,
+        ImageStatistics imageStatistics,
+        Func<double, double, double> calculateLocalThreshold,
+        CancellationToken cancellationToken,
+        bool normalizePixelBrightness = false)
     {
-        var result = new byte[gray.Length];
-        int radius = window / 2;
-        for (int y = 0; y < height; y++)
+        var binaryPixels = new byte[grayscalePixels.Length];
+        int windowRadius = windowSize / 2;
+
+        for (int pixelRow = 0; pixelRow < imageHeight; pixelRow++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            int rowOffset = y * width;
-            int top = Math.Max(0, y - radius), bottom = Math.Min(height, y + radius + 1);
-            for (int x = 0; x < width; x++)
+
+            int imageRowStartIndex = pixelRow * imageWidth;
+            int windowTopRow = Math.Max(0, pixelRow - windowRadius);
+            int windowBottomRowExclusive = Math.Min(imageHeight, pixelRow + windowRadius + 1);
+
+            for (int pixelColumn = 0; pixelColumn < imageWidth; pixelColumn++)
             {
-                int left = Math.Max(0, x - radius), right = Math.Min(width, x + radius + 1);
-                int count = (right - left) * (bottom - top);
-                double mean = Area(statistics.Sums, left, top, right, bottom, statistics.Stride) / count;
-                double meanSquare = Area(statistics.Squares, left, top, right, bottom, statistics.Stride) / count;
-                double std = Math.Sqrt(Math.Max(0, meanSquare - mean * mean));
-                int index = rowOffset + x;
-                double value = normalize ? gray[index] / 255 : gray[index];
-                result[index] = Binary(value, calculateThreshold(mean, std));
+                int windowLeftColumn = Math.Max(0, pixelColumn - windowRadius);
+                int windowRightColumnExclusive = Math.Min(imageWidth, pixelColumn + windowRadius + 1);
+
+                int windowPixelCount = (windowRightColumnExclusive - windowLeftColumn)
+                    * (windowBottomRowExclusive - windowTopRow);
+
+                double localMeanBrightness = Area(
+                    imageStatistics.BrightnessSumTable,
+                    windowLeftColumn, windowTopRow, windowRightColumnExclusive, windowBottomRowExclusive,
+                    imageStatistics.IntegralTableWidth) / windowPixelCount;
+
+                double localMeanSquaredBrightness = Area(
+                    imageStatistics.SquaredBrightnessSumTable,
+                    windowLeftColumn, windowTopRow, windowRightColumnExclusive, windowBottomRowExclusive,
+                    imageStatistics.IntegralTableWidth) / windowPixelCount;
+
+                double localStandardDeviation = Math.Sqrt(Math.Max(0,
+                    localMeanSquaredBrightness - localMeanBrightness * localMeanBrightness));
+
+                int pixelIndex = imageRowStartIndex + pixelColumn;
+                double pixelBrightness = normalizePixelBrightness
+                    ? grayscalePixels[pixelIndex] / 255
+                    : grayscalePixels[pixelIndex];
+
+                binaryPixels[pixelIndex] = Binary(pixelBrightness,
+                    calculateLocalThreshold(localMeanBrightness, localStandardDeviation));
             }
         }
-        return result;
+
+        return binaryPixels;
     }
 
-    private static byte Binary(double value, double threshold) => value > threshold ? (byte)255 : (byte)0;
+    private static byte Binary(double pixelBrightness, double threshold) =>
+        pixelBrightness > threshold ? (byte)255 : (byte)0;
 
-    private static double Area(double[] integral, int left, int top, int right, int bottom, int stride) =>
-        integral[bottom * stride + right] - integral[top * stride + right]
-        - integral[bottom * stride + left] + integral[top * stride + left];
+    private static double Area(
+        double[] sumTable,
+        int windowLeftColumn,
+        int windowTopRow,
+        int windowRightColumnExclusive,
+        int windowBottomRowExclusive,
+        int integralTableWidth) =>
+        sumTable[windowBottomRowExclusive * integralTableWidth + windowRightColumnExclusive]
+        - sumTable[windowTopRow * integralTableWidth + windowRightColumnExclusive]
+        - sumTable[windowBottomRowExclusive * integralTableWidth + windowLeftColumn]
+        + sumTable[windowTopRow * integralTableWidth + windowLeftColumn];
 
-    private readonly record struct ImageStatistics(double[] Sums, double[] Squares, int[] Histogram, int Stride);
+    private readonly record struct ImageStatistics(
+        double[] BrightnessSumTable,
+        double[] SquaredBrightnessSumTable,
+        int[] BrightnessHistogram,
+        int IntegralTableWidth);
 
-    private static int FindOtsuThreshold(int[] histogram, int count)
+    private static int FindOtsuThreshold(int[] brightnessHistogram, int totalPixelCount)
     {
-        double sum = 0;
-        for (int i = 0; i < 256; i++) sum += i * (double)histogram[i];
-        int background = 0, threshold = 0;
-        double backgroundSum = 0, best = -1;
-        for (int t = 0; t < 256; t++)
+        double totalBrightnessSum = 0;
+
+        for (int brightnessLevel = 0; brightnessLevel < 256; brightnessLevel++)
         {
-            background += histogram[t];
-            if (background == 0) continue;
-            int foreground = count - background;
-            if (foreground == 0) break;
-            backgroundSum += t * (double)histogram[t];
-            double difference = backgroundSum / background - (sum - backgroundSum) / foreground;
-            double variance = (double)background * foreground * difference * difference;
-            if (variance > best) { best = variance; threshold = t; }
+            totalBrightnessSum += brightnessLevel * (double)brightnessHistogram[brightnessLevel];
         }
-        return threshold;
+
+        int backgroundPixelCount = 0;
+        int bestThreshold = 0;
+        double backgroundBrightnessSum = 0;
+        double highestBetweenClassVariance = -1;
+
+        for (int candidateThreshold = 0; candidateThreshold < 256; candidateThreshold++)
+        {
+            backgroundPixelCount += brightnessHistogram[candidateThreshold];
+
+            if (backgroundPixelCount == 0)
+            {
+                continue;
+            }
+
+            int foregroundPixelCount = totalPixelCount - backgroundPixelCount;
+
+            if (foregroundPixelCount == 0)
+            {
+                break;
+            }
+
+            backgroundBrightnessSum += candidateThreshold * (double)brightnessHistogram[candidateThreshold];
+            double classMeanDifference = backgroundBrightnessSum / backgroundPixelCount
+                - (totalBrightnessSum - backgroundBrightnessSum) / foregroundPixelCount;
+            double betweenClassVariance = (double)backgroundPixelCount * foregroundPixelCount
+                * classMeanDifference * classMeanDifference;
+
+            if (betweenClassVariance > highestBetweenClassVariance)
+            {
+                highestBetweenClassVariance = betweenClassVariance;
+                bestThreshold = candidateThreshold;
+            }
+        }
+
+        return bestThreshold;
     }
 }
