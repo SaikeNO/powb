@@ -36,18 +36,10 @@
         <Border Grid.Row="0" Style="{StaticResource Card}" Padding="10" Margin="0,0,0,8">
             <WrapPanel>
                 <Button Content="Otwórz obraz…" Click="Open_Click"/>
-                <Button x:Name="SaveButton" Content="Zapisz szkielet…" Click="Save_Click" IsEnabled="False"/>
+                <Button x:Name="SaveButton" Content="Zapisz zaznaczony szkielet…" Click="Save_Click" IsEnabled="False"/>
                 <Rectangle Width="1" Fill="#D1D5DB" Margin="4,0,12,0"/>
-                <TextBlock Text="Algorytm:" Style="{StaticResource Label}"/>
-                <ComboBox x:Name="AlgoCombo" SelectedIndex="0" Width="130" Margin="0,0,12,0" SelectionChanged="Settings_Changed">
-                    <ComboBoxItem Content="Zhang-Suen"/>
-                    <ComboBoxItem Content="Guo-Hall"/>
-                    <ComboBoxItem Content="KMM"/>
-                    <ComboBoxItem Content="K3M"/>
-                </ComboBox>
                 <CheckBox x:Name="OverlayCheck" Content="Nakładka na obraz" VerticalAlignment="Center" Margin="0,0,12,0"
-                          Click="Settings_Changed" ToolTip="Pokaż szkielet (czerwony) na tle obiektu"/>
-                <Button Content="Porównaj wszystkie" Click="Compare_Click"/>
+                          Click="Overlay_Click" ToolTip="Pokaż szkielet (czerwony) na tle obiektu"/>
             </WrapPanel>
         </Border>
 
@@ -76,6 +68,8 @@
                 <ColumnDefinition/>
                 <ColumnDefinition Width="8"/>
                 <ColumnDefinition/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="290"/>
             </Grid.ColumnDefinitions>
             <Border Grid.Column="0" Style="{StaticResource Card}">
                 <DockPanel>
@@ -97,7 +91,36 @@
                     </ScrollViewer>
                 </DockPanel>
             </Border>
-            <TextBlock x:Name="DropHint" Grid.ColumnSpan="3" HorizontalAlignment="Center" VerticalAlignment="Center"
+            <Border Grid.Column="4" Style="{StaticResource Card}">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Algorytmy" Style="{StaticResource Caption}"/>
+                    <StackPanel DockPanel.Dock="Bottom" Margin="10">
+                        <Button x:Name="StartButton" Content="▶  Start" Click="Start_Click" Margin="0" Padding="12,8"
+                                FontWeight="SemiBold" IsEnabled="False"/>
+                        <TextBlock Text="Zaznaczone algorytmy są wykonywane po kolei na bieżącym obrazie binarnym. Kliknij wiersz, aby zobaczyć wynik."
+                                   TextWrapping="Wrap" Foreground="#6B7280" FontSize="11" Margin="0,8,0,0"/>
+                    </StackPanel>
+                    <ListBox x:Name="AlgoList" BorderThickness="0" HorizontalContentAlignment="Stretch"
+                             SelectionChanged="AlgoList_SelectionChanged">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="2,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <CheckBox IsChecked="{Binding Selected}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding Info}" Foreground="#4B5563" FontSize="12"/>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+            <TextBlock x:Name="DropHint" Grid.ColumnSpan="5" HorizontalAlignment="Center" VerticalAlignment="Center"
                        Text="Przeciągnij tu obraz lub kliknij „Otwórz obraz…”" FontSize="18" Foreground="#9CA3AF"
                        IsHitTestVisible="False"/>
         </Grid>

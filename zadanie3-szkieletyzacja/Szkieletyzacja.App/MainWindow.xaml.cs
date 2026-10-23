@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
-using System.Text;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -17,17 +18,32 @@ public partial class MainWindow : Window
 
     private byte[]? _gray;
     private byte[]? _binary;
-    private byte[]? _skeleton;
     private int _w, _h;          // rozmiar obrazu
     private int _W, _H;          // rozmiar z ramką
     private string _fileName = "";
-    private bool _syncing, _loading;
+    private bool _syncing, _loading, _running;
 
-    private ThinningAlgorithm Algorithm => (ThinningAlgorithm)AlgoCombo.SelectedIndex;
+    private readonly ObservableCollection<AlgoRow> _rows = new();
 
     public MainWindow()
     {
         InitializeComponent();
+        foreach (ThinningAlgorithm a in Enum.GetValues<ThinningAlgorithm>())
+            _rows.Add(new AlgoRow(a));
+        AlgoList.ItemsSource = _rows;
+        WarmUp();
+        Loaded += (_, _) => LoadImage(new BitmapImage(new Uri("pack://application:,,,/Assets/sample.png")), "przykład: odcisk palca");
+    }
+
+    /// <summary>Wstępne uruchomienie na małym obrazie, żeby JIT nie zafałszował pomiarów.</summary>
+    private static void WarmUp()
+    {
+        const int n = 40;
+        var img = new byte[(n + 2) * (n + 2)];
+        for (int y = 5; y < 30; y++)
+            for (int x = 5; x < 30; x++) img[(y + 1) * (n + 2) + x + 1] = 1;
+        foreach (ThinningAlgorithm a in Enum.GetValues<ThinningAlgorithm>())
+            Thinning.Run(a, img, n + 2, n + 2);
     }
 
     // ---------- ładowanie ----------
@@ -59,15 +75,19 @@ public partial class MainWindow : Window
             bmp.UriSource = new Uri(path);
             bmp.EndInit();
             bmp.Freeze();
-            _gray = ImageUtils.ToGray(bmp, out _w, out _h);
+            LoadImage(bmp, Path.GetFileName(path));
         }
         catch (Exception ex)
         {
             StatusText.Text = "Nie udało się wczytać obrazu: " + ex.Message;
-            return;
         }
+    }
+
+    private void LoadImage(BitmapSource bmp, string name)
+    {
+        _gray = ImageUtils.ToGray(bmp, out _w, out _h);
         _W = _w + 2; _H = _h + 2;
-        _fileName = Path.GetFileName(path);
+        _fileName = name;
         DropHint.Visibility = Visibility.Collapsed;
 
         // domyślny próg automatyczny (Otsu)
@@ -95,66 +115,87 @@ public partial class MainWindow : Window
         ThresholdSlider.Value = ImageUtils.Otsu(_gray);
     }
 
-    /// <summary>Binaryzacja + szkieletyzacja (jest szybka, więc działa na żywo).</summary>
     private void Rebuild()
     {
         if (_gray == null) return;
         _binary = ImageUtils.BinarizePadded(_gray, _w, _h, (int)ThresholdSlider.Value,
                                             DarkObjectCheck.IsChecked == true);
         BinaryImage.Source = ImageUtils.ToBitmap(_binary, _W, _H);
-        Thin();
+        foreach (var r in _rows) r.Reset();
+        ResultImage.Source = null;
+        ResultCaption.Text = "Szkielet";
+        SaveButton.IsEnabled = false;
+        StartButton.IsEnabled = !_running;
+        int obj = ImageUtils.CountObject(_binary);
+        StatusText.Text = $"{_fileName}  |  {_w}×{_h} px  |  obiekt: {obj} px  |  zaznacz algorytmy i kliknij Start.";
     }
 
-    private void Settings_Changed(object sender, RoutedEventArgs e)
+    // ---------- szkieletyzacja ----------
+
+    private async void Start_Click(object sender, RoutedEventArgs e)
     {
-        if (!IsLoaded || _binary == null) return;
-        Thin();
-    }
+        if (_binary == null || _running) return;
+        var chosen = _rows.Where(r => r.Selected).ToList();
+        if (chosen.Count == 0) { StatusText.Text = "Zaznacz co najmniej jeden algorytm."; return; }
 
-    private void Thin()
-    {
-        if (_binary == null) return;
-        var algo = Algorithm;
-        var sw = Stopwatch.StartNew();
-        _skeleton = Thinning.Run(algo, _binary, _W, _H);
-        sw.Stop();
+        _running = true;
+        StartButton.IsEnabled = false;
+        var binary = _binary;
+        int W = _W, H = _H;
+        foreach (var r in chosen) r.Reset();
 
-        ResultImage.Source = OverlayCheck.IsChecked == true
-            ? ImageUtils.ToOverlay(_binary, _skeleton, _W, _H, Colors.Red)
-            : ImageUtils.ToBitmap(_skeleton, _W, _H);
-        ResultCaption.Text = $"Szkielet — {Thinning.Name(algo)}";
-        SaveButton.IsEnabled = true;
-
-        int obj = ImageUtils.CountObject(_binary), skel = ImageUtils.CountObject(_skeleton);
-        StatusText.Text = $"{_fileName}  |  {_w}×{_h} px  |  {Thinning.Name(algo)}: {sw.Elapsed.TotalMilliseconds:F1} ms  |  " +
-                          $"obiekt: {obj} px → szkielet: {skel} px" + (obj > 0 ? $" ({100.0 * skel / obj:F1}%)" : "");
-    }
-
-    private void Compare_Click(object sender, RoutedEventArgs e)
-    {
-        if (_binary == null) { StatusText.Text = "Najpierw otwórz obraz."; return; }
-        var sb = new StringBuilder($"{_fileName} {_w}×{_h}:  ");
-        foreach (ThinningAlgorithm a in Enum.GetValues<ThinningAlgorithm>())
+        foreach (var row in chosen)
         {
-            Thinning.Run(a, _binary, _W, _H);   // rozgrzewka JIT
-            var sw = Stopwatch.StartNew();
-            var res = Thinning.Run(a, _binary, _W, _H);
-            sw.Stop();
-            sb.Append($"{Thinning.Name(a)} {sw.Elapsed.TotalMilliseconds:F1} ms ({ImageUtils.CountObject(res)} px)   ");
+            row.Info = "liczę…";
+            // wykonanie poza wątkiem UI; mierzony jest wyłącznie czas samego algorytmu
+            var (result, ms) = await Task.Run(() =>
+            {
+                var sw = Stopwatch.StartNew();
+                var res = Thinning.Run(row.Algorithm, binary, W, H);
+                sw.Stop();
+                return (res, sw.Elapsed.TotalMilliseconds);
+            });
+            row.Result = result;
+            row.Milliseconds = ms;
+            row.Pixels = ImageUtils.CountObject(result);
+            row.Info = $"{ms:F2} ms  |  szkielet: {row.Pixels} px";
+            AlgoList.SelectedItem = row;   // pokazuje wynik bieżącego algorytmu
         }
-        StatusText.Text = sb.ToString();
+
+        _running = false;
+        StartButton.IsEnabled = true;
+        StatusText.Text = $"{_fileName}  |  " + string.Join("   ", chosen.Select(r => $"{r.Name}: {r.Milliseconds:F2} ms"));
+    }
+
+    private void AlgoList_SelectionChanged(object sender, SelectionChangedEventArgs e) => ShowSelected();
+
+    private void Overlay_Click(object sender, RoutedEventArgs e) => ShowSelected();
+
+    private void ShowSelected()
+    {
+        if (_binary == null || AlgoList.SelectedItem is not AlgoRow { Result: { } result } row)
+        {
+            ResultImage.Source = null;
+            SaveButton.IsEnabled = false;
+            return;
+        }
+        ResultImage.Source = OverlayCheck.IsChecked == true
+            ? ImageUtils.ToOverlay(_binary, result, _W, _H, Colors.Red)
+            : ImageUtils.ToBitmap(result, _W, _H);
+        ResultCaption.Text = $"Szkielet — {row.Name} ({row.Milliseconds:F2} ms)";
+        SaveButton.IsEnabled = true;
     }
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        if (_skeleton == null) return;
+        if (AlgoList.SelectedItem is not AlgoRow { Result: { } result } row) return;
         var dlg = new SaveFileDialog
         {
             Filter = "PNG|*.png",
-            FileName = $"{Path.GetFileNameWithoutExtension(_fileName)}_{Thinning.Name(Algorithm)}.png"
+            FileName = $"{Path.GetFileNameWithoutExtension(_fileName)}_{row.Name}.png"
         };
         if (dlg.ShowDialog() != true) return;
-        ImageUtils.SavePng(ImageUtils.ToBitmap(_skeleton, _W, _H), dlg.FileName);
+        ImageUtils.SavePng(ImageUtils.ToBitmap(result, _W, _H), dlg.FileName);
         StatusText.Text = "Zapisano: " + dlg.FileName;
     }
 
@@ -199,4 +240,26 @@ public partial class MainWindow : Window
         to.ScrollToVerticalOffset(from.VerticalOffset);
         _syncing = false;
     }
+}
+
+public sealed class AlgoRow : INotifyPropertyChanged
+{
+    private string _info = "—";
+    private bool _selected = true;
+
+    public AlgoRow(ThinningAlgorithm algorithm) { Algorithm = algorithm; }
+
+    public ThinningAlgorithm Algorithm { get; }
+    public string Name => Thinning.Name(Algorithm);
+    public byte[]? Result { get; set; }
+    public double Milliseconds { get; set; }
+    public int Pixels { get; set; }
+
+    public bool Selected { get => _selected; set { _selected = value; Raise(nameof(Selected)); } }
+    public string Info { get => _info; set { _info = value; Raise(nameof(Info)); } }
+
+    public void Reset() { Result = null; Milliseconds = 0; Pixels = 0; Info = "—"; }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void Raise(string n) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
 }

@@ -17,8 +17,8 @@ Projects: `Szkieletyzacja.Core` (`net10.0`) contains the algorithms, `Szkieletyz
 ## Demo
 
 1. Open an image (button or drag & drop; PNG, JPEG, BMP, TIFF). It is binarized with the Otsu threshold automatically.
-2. Adjust the **threshold** / **dark object** if needed. The skeleton is recomputed live because the algorithms are fast.
-3. Pick the algorithm, toggle the **overlay** (skeleton in red over the shape), zoom with the slider or Ctrl+wheel (both previews scroll together), **Compare all** shows time and pixel count per algorithm, **Save skeleton** writes a PNG.
+2. Adjust the **threshold** / **dark object** if needed. 
+3. A sample fingerprint is loaded at start. Tick any algorithms and press **Start**: they run one after another and each row shows its real execution time (algorithm only, after a JIT warm-up) and skeleton size. Click a row to view its result, toggle the **overlay** (skeleton in red over the shape), zoom with the slider or Ctrl+wheel (both previews scroll together), **Save** writes the selected skeleton as PNG.
 
 Good test images: fingerprints, clean drawings, QR codes. Photos without clear shapes produce noise rather than a useful skeleton.
 
@@ -40,11 +40,9 @@ Two sub-passes per iteration; candidates are collected first and deleted after t
 | 1 | `2 ≤ B ≤ 6`, `A = 1`, `P2·P4·P6 = 0`, `P4·P6·P8 = 0` |
 | 2 | `2 ≤ B ≤ 6`, `A = 1`, `P2·P4·P8 = 0`, `P2·P6·P8 = 0` |
 
-### KMM (variant)
+### KMM (Saeed, Rybnik, Tabędzki 2001)
 
-Each neighbour has a weight (`N=1, NE=2, E=4, SE=8, S=16, SW=32, W=64, NW=128`), and the sum of weights of object neighbours indexes a 256-entry `Deletable` table. Every iteration has two phases: pixels with a background 4-neighbour first, then corner pixels. Pixels are deleted sequentially, evaluated on the current image.
-
-**Note:** the `Deletable` table is generated from the `B`/`A` rules (`2 ≤ B ≤ 7`, `A = 1`) rather than copied from the original KMM paper, so this is a KMM-style variant with the same weight mask and phase structure. Replace `BuildDeletableTable` in `Thinning.cs` if the exact original table is required.
+Implemented as in the paper: (1) contour pixels touching the background by an edge become `2`, by a corner only `3`; (2) contour pixels whose weight is one of the 24 patterns with 2, 3 or 4 neighbours become `4` and all `4`s are deleted; (3) for `N = 2` and then `N = 3` every pixel labelled `N` is deleted if its neighbour weight is in the paper's 120-element *Deletion Array*, otherwise it returns to `1`. Repeated until nothing is deleted.
 
 ### Guo-Hall
 
@@ -52,7 +50,7 @@ Same two sub-pass structure as Zhang-Suen, with the conditions `C(P)=1`, `2 ≤ 
 
 ### K3M
 
-Per iteration border pixels are marked, then 5 phases delete marked pixels whose neighbour weight belongs to the phase's set (sets from Saeed et al. 2010), evaluated on the current image.
+Per iteration phase 0 marks border pixels (`A0`), phases 1-5 delete marked pixels whose weight is in `A1..A5` (sequentially, on the current image). After the iterations a final phase deletes pixels in `A1pix` to get a 1-pixel-wide skeleton. All arrays are taken from Saeed et al., 2010.
 
 ### Speed
 
