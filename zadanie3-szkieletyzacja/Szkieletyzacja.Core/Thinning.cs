@@ -12,38 +12,6 @@ public static class Thinning
     private static readonly bool[] GuoHallFirstSubIteration = BuildGuoHallTable(isFirstSubIteration: true);
     private static readonly bool[] GuoHallSecondSubIteration = BuildGuoHallTable(isFirstSubIteration: false);
 
-    private static readonly bool[] KmmDeletionArray = CreateLookupTable(
-        3, 5, 7, 12, 13, 14, 15, 20, 21, 22, 23, 28, 29, 30, 31, 48, 52, 53, 54, 55, 56, 60, 61, 62, 63, 65, 67, 69, 71,
-        77, 79, 80, 81, 83, 84, 85, 86, 87, 88, 89, 91, 92, 93, 94, 95, 97, 99, 101, 103, 109, 111, 112, 113, 115, 116,
-        117, 118, 119, 120, 121, 123, 124, 125, 126, 127, 131, 133, 135, 141, 143, 149, 151, 157, 159, 181, 183, 189,
-        191, 192, 193, 195, 197, 199, 205, 207, 208, 209, 211, 212, 213, 214, 215, 216, 217, 219, 220, 221, 222, 223,
-        224, 225, 227, 229, 231, 237, 239, 240, 241, 243, 244, 245, 246, 247, 248, 249, 251, 252, 253, 254, 255);
-
-    private static readonly bool[] KmmContourWithTwoToFourNeighbours = CreateLookupTable(
-        3, 6, 12, 24, 48, 96, 192, 129,
-        7, 14, 28, 56, 112, 224, 193, 131,
-        15, 30, 60, 120, 240, 225, 195, 135);
-
-    private static readonly bool[] K3MBorderArray = CreateLookupTable(
-        3, 6, 7, 12, 14, 15, 24, 28, 30, 31, 48, 56, 60, 62, 63, 96, 112, 120, 124, 126, 127, 129, 131, 135, 143, 159,
-        191, 192, 193, 195, 199, 207, 223, 224, 225, 227, 231, 239, 240, 241, 243, 247, 248, 249, 251, 252, 253, 254);
-
-    private static readonly bool[] K3MOnePixelWidthArray = CreateLookupTable(
-        3, 6, 7, 12, 14, 15, 24, 28, 30, 31, 48, 56, 60, 62, 63, 96, 112, 120, 124, 126, 127, 129, 131, 135, 143, 159,
-        191, 192, 193, 195, 199, 207, 223, 224, 225, 227, 231, 239, 240, 241, 243, 247, 248, 249, 251, 252, 253, 254);
-
-    private static readonly bool[][] K3MDeletionPhases =
-    {
-        CreateLookupTable(7, 14, 28, 56, 112, 131, 193, 224),
-        CreateLookupTable(7, 14, 15, 28, 30, 56, 60, 112, 120, 131, 135, 193, 195, 224, 225, 240),
-        CreateLookupTable(7, 14, 15, 28, 30, 31, 56, 60, 62, 112, 120, 124, 131, 135, 143, 193, 195, 199, 224, 225, 227,
-            240, 241, 248),
-        CreateLookupTable(7, 14, 15, 28, 30, 31, 56, 60, 62, 63, 112, 120, 124, 126, 131, 135, 143, 159, 193, 195, 199,
-            207, 224, 225, 227, 231, 240, 241, 243, 248, 249, 252),
-        CreateLookupTable(7, 14, 15, 28, 30, 31, 56, 60, 62, 63, 112, 120, 124, 126, 131, 135, 143, 159, 191, 193, 195,
-            199, 207, 224, 225, 227, 231, 239, 240, 241, 243, 248, 249, 251, 252, 254)
-    };
-
     public static byte[] Run(ThinningAlgorithm algorithm, byte[] image, int paddedWidth, int paddedHeight)
     {
         switch (algorithm)
@@ -91,7 +59,7 @@ public static class Thinning
             {
                 int pixelIndex = contourPixels[contourIndex];
                 int weight = GetNonZeroNeighbourhoodWeight(result, pixelIndex, paddedWidth);
-                if (KmmContourWithTwoToFourNeighbours[weight])
+                if (LookupTables.KmmContourWithTwoToFourNeighbours[weight])
                 {
                     contourPixels[pixelsToDeleteCount] = pixelIndex;
                     pixelsToDeleteCount++;
@@ -120,7 +88,7 @@ public static class Thinning
                         }
 
                         int weight = GetNonZeroNeighbourhoodWeight(result, pixelIndex, paddedWidth);
-                        if (KmmDeletionArray[weight])
+                        if (LookupTables.KmmDeletionArray[weight])
                         {
                             result[pixelIndex] = Background;
                             anyPixelDeleted = true;
@@ -154,7 +122,7 @@ public static class Thinning
                 for (int x = 1; x < paddedWidth - 1; x++, pixelIndex++)
                 {
                     if (result[pixelIndex] != Background &&
-                        K3MBorderArray[GetNeighbourhoodWeight(result, pixelIndex, paddedWidth)])
+                        LookupTables.K3MBorderArray[GetNeighbourhoodWeight(result, pixelIndex, paddedWidth)])
                     {
                         borderPixels[borderCount] = pixelIndex;
                         borderCount++;
@@ -162,7 +130,7 @@ public static class Thinning
                 }
             }
 
-            foreach (bool[] deletionPhase in K3MDeletionPhases)
+            foreach (bool[] deletionPhase in LookupTables.K3MDeletionPhases)
             {
                 for (int borderIndex = 0; borderIndex < borderCount; borderIndex++)
                 {
@@ -183,7 +151,7 @@ public static class Thinning
             for (int x = 1; x < paddedWidth - 1; x++, pixelIndex++)
             {
                 if (result[pixelIndex] != Background &&
-                    K3MOnePixelWidthArray[GetNeighbourhoodWeight(result, pixelIndex, paddedWidth)])
+                    LookupTables.K3MOnePixelWidthArray[GetNeighbourhoodWeight(result, pixelIndex, paddedWidth)])
                 {
                     result[pixelIndex] = Background;
                 }
@@ -372,16 +340,6 @@ public static class Thinning
             {
                 table[weight] = !((south || southWest || !northWest) && west);
             }
-        }
-        return table;
-    }
-
-    private static bool[] CreateLookupTable(params int[] weightsToMark)
-    {
-        var table = new bool[256];
-        foreach (int weight in weightsToMark)
-        {
-            table[weight] = true;
         }
         return table;
     }
