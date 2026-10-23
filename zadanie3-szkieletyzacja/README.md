@@ -1,6 +1,6 @@
 # Skeletonization (thinning) — Image Processing in Biometrics
 
-C# / .NET 10 Windows desktop assignment. Two thinning algorithms, **Zhang-Suen** and **KMM**, are implemented from scratch; WPF is used only for the UI and image decoding.
+C# / .NET 10 Windows desktop assignment. Four thinning algorithms, **Zhang-Suen**, **Guo-Hall**, **KMM** and **K3M**, are implemented from scratch; WPF is used only for the UI and image decoding.
 
 ## Build and run
 
@@ -16,9 +16,9 @@ Projects: `Szkieletyzacja.Core` (`net10.0`) contains the algorithms, `Szkieletyz
 
 ## Demo
 
-1. Click **Open image** and choose PNG, JPEG, BMP or TIFF. The image is converted to grayscale and binarized with a simple threshold.
-2. Adjust the **threshold** slider and the **dark object** checkbox until the shape you want to thin is black in the left preview.
-3. Choose **Zhang-Suen** or **KMM** and click **Thin**. The skeleton appears on the right together with the elapsed time.
+1. Open an image (button or drag & drop; PNG, JPEG, BMP, TIFF). It is binarized with the Otsu threshold automatically.
+2. Adjust the **threshold** / **dark object** if needed. The skeleton is recomputed live because the algorithms are fast.
+3. Pick the algorithm, toggle the **overlay** (skeleton in red over the shape), zoom with the slider or Ctrl+wheel (both previews scroll together), **Compare all** shows time and pixel count per algorithm, **Save skeleton** writes a PNG.
 
 Good test images: fingerprints, clean drawings, QR codes. Photos without clear shapes produce noise rather than a useful skeleton.
 
@@ -46,9 +46,17 @@ Each neighbour has a weight (`N=1, NE=2, E=4, SE=8, S=16, SW=32, W=64, NW=128`),
 
 **Note:** the `Deletable` table is generated from the `B`/`A` rules (`2 ≤ B ≤ 7`, `A = 1`) rather than copied from the original KMM paper, so this is a KMM-style variant with the same weight mask and phase structure. Replace `BuildDeletableTable` in `Thinning.cs` if the exact original table is required.
 
+### Guo-Hall
+
+Same two sub-pass structure as Zhang-Suen, with the conditions `C(P)=1`, `2 ≤ min(N1,N2) ≤ 3` and the sub-pass tests `(P2∨P3∨¬P5)∧P4=0` / `(P6∨P7∨¬P9)∧P8=0`. Gives thinner, more isotropic skeletons.
+
+### K3M
+
+Per iteration border pixels are marked, then 5 phases delete marked pixels whose neighbour weight belongs to the phase's set (sets from Saeed et al. 2010), evaluated on the current image.
+
 ### Speed
 
-Algorithms work on flat `byte[]` arrays (no `GetPixel`/`SetPixel`). A test thins a random 1500×1500 image and asserts it finishes in under one second.
+Algorithms work on flat `byte[]` arrays (no `GetPixel`/`SetPixel`). Every deletion rule is precomputed into a 256-entry lookup table indexed by the neighbourhood mask, so each pixel costs one mask computation and one table read. A test thins a random 1500×1500 image and asserts it finishes in under one second.
 
 ## Core API
 
@@ -56,6 +64,9 @@ Algorithms work on flat `byte[]` arrays (no `GetPixel`/`SetPixel`). A test thins
 // image: flat 0/1 array with a 1-pixel border, so W = width + 2, H = height + 2
 byte[] skeleton = Thinning.ZhangSuen(image, W, H);
 byte[] skeleton2 = Thinning.Kmm(image, W, H);
+byte[] skeleton3 = Thinning.GuoHall(image, W, H);
+byte[] skeleton4 = Thinning.K3M(image, W, H);
+byte[] any = Thinning.Run(ThinningAlgorithm.K3M, image, W, H);
 ```
 
 Both methods return a new array and do not modify the input.

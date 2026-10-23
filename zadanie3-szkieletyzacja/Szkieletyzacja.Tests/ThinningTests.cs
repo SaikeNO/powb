@@ -7,7 +7,9 @@ public class ThinningTests
     public static IEnumerable<object[]> Algorithms()
     {
         yield return new object[] { "ZhangSuen", (Func<byte[], int, int, byte[]>)Thinning.ZhangSuen };
+        yield return new object[] { "GuoHall", (Func<byte[], int, int, byte[]>)Thinning.GuoHall };
         yield return new object[] { "KMM", (Func<byte[], int, int, byte[]>)Thinning.Kmm };
+        yield return new object[] { "K3M", (Func<byte[], int, int, byte[]>)Thinning.K3M };
     }
 
     private static Img Run(Func<byte[], int, int, byte[]> algo, Img img) =>
