@@ -161,8 +161,8 @@ public static class Thinning
         return result;
     }
 
-    private static byte[] ThinWithTwoSubIterations(
-        byte[] image, int paddedWidth, int paddedHeight, bool[] firstSubIteration, bool[] secondSubIteration)
+    private static byte[] ThinWithTwoSubIterations(byte[] image, int paddedWidth, int paddedHeight,
+        bool[] firstSubIteration, bool[] secondSubIteration)
     {
         var result = (byte[])image.Clone();
         var pixelsToDelete = new int[result.Length];
@@ -276,26 +276,37 @@ public static class Thinning
 
     private static bool[] BuildZhangSuenTable(bool isFirstSubIteration)
     {
+        // tablica decyzji: indeks = waga otoczenia (0-255), wartoœæ = czy usun¹æ piksel
         var table = new bool[256];
+
+        // sprawdzamy po kolei ka¿de mo¿liwe otoczenie piksela
         for (int weight = 0; weight < 256; weight++)
         {
-            int north = weight & 1;
-            int east = weight >> 2 & 1;
-            int south = weight >> 4 & 1;
-            int west = weight >> 6 & 1;
+            // wyci¹gamy z wagi czterech s¹siadów (1 = obiekt, 0 = t³o)
+            int north = weight & 1; // czy N = 1
+            int east = weight >> 2 & 1; // czy E = 1
+            int south = weight >> 4 & 1; // czy S = 1
+            int west = weight >> 6 & 1; // czy W = 1
 
+            // ilu s¹siadów (ze wszystkich oœmiu) jest obiektem
             int neighbourCount = CountNeighbours(weight);
+
+            // jeœli krawêdŸ, œrodek lub rozerwanie (>1 0->1) nie usuwamy
+            // < 2 : koniec linii, > 6 : wnêtrze, != 1 : s¹siedzi tworz¹ wiêcej ni¿ jedn¹ grupê
             if (neighbourCount < 2 || neighbourCount > 6 || CountBackgroundToObjectTransitions(weight) != 1)
             {
-                continue;
+                continue; // zostaje false
             }
 
+            // warunek kierunkowy (iloczyn = 1 tylko gdy wszyscy trzej s¹siedzi s¹ obiektem)
             if (isFirstSubIteration)
             {
+                // przejœcie 1: nie usuwamy, gdy N,E,S albo E,S,W s¹ jednoczeœnie obiektem (usuwa doln¹ i praw¹ stronê)
                 table[weight] = north * east * south == 0 && east * south * west == 0;
             }
             else
             {
+                // przejœcie 2: nie usuwamy, gdy N,E,W albo N,S,W s¹ jednoczeœnie obiektem (usuwa górn¹ i lew¹ stronê)
                 table[weight] = north * east * west == 0 && north * south * west == 0;
             }
         }
@@ -367,6 +378,7 @@ public static class Thinning
         int transitions = 0;
         for (int bitIndex = 0; bitIndex < 8; bitIndex++)
         {
+            // zliczanie przejœæ 0 -> 1
             if (!IsBitSet(weight, bitIndex) && IsBitSet(weight, (bitIndex + 1) & 7))
             {
                 transitions++;
