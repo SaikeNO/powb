@@ -1,227 +1,419 @@
 namespace Szkieletyzacja.Core;
 
-public enum ThinningAlgorithm { ZhangSuen, GuoHall, Kmm, K3M }
-
 public static class Thinning
 {
+    private const byte Background = 0;
+    private const byte Object = 1;
+    private const byte EdgeContour = 2;
+    private const byte CornerContour = 3;
 
-    public static string Name(ThinningAlgorithm a) => a switch
-    {
-        ThinningAlgorithm.ZhangSuen => "Zhang-Suen",
-        ThinningAlgorithm.GuoHall => "Guo-Hall",
-        ThinningAlgorithm.Kmm => "KMM",
-        ThinningAlgorithm.K3M => "K3M",
-        _ => a.ToString()
-    };
+    private static readonly bool[] ZhangSuenFirstSubIteration = BuildZhangSuenTable(isFirstSubIteration: true);
+    private static readonly bool[] ZhangSuenSecondSubIteration = BuildZhangSuenTable(isFirstSubIteration: false);
+    private static readonly bool[] GuoHallFirstSubIteration = BuildGuoHallTable(isFirstSubIteration: true);
+    private static readonly bool[] GuoHallSecondSubIteration = BuildGuoHallTable(isFirstSubIteration: false);
 
-    public static byte[] Run(ThinningAlgorithm a, byte[] src, int W, int H) => a switch
-    {
-        ThinningAlgorithm.ZhangSuen => ZhangSuen(src, W, H),
-        ThinningAlgorithm.GuoHall => GuoHall(src, W, H),
-        ThinningAlgorithm.Kmm => Kmm(src, W, H),
-        ThinningAlgorithm.K3M => K3M(src, W, H),
-        _ => throw new ArgumentOutOfRangeException(nameof(a))
-    };
+    private static readonly bool[] KmmDeletionArray = CreateLookupTable(
+        3, 5, 7, 12, 13, 14, 15, 20, 21, 22, 23, 28, 29, 30, 31, 48, 52, 53, 54, 55, 56, 60, 61, 62, 63, 65, 67, 69, 71,
+        77, 79, 80, 81, 83, 84, 85, 86, 87, 88, 89, 91, 92, 93, 94, 95, 97, 99, 101, 103, 109, 111, 112, 113, 115, 116,
+        117, 118, 119, 120, 121, 123, 124, 125, 126, 127, 131, 133, 135, 141, 143, 149, 151, 157, 159, 181, 183, 189,
+        191, 192, 193, 195, 197, 199, 205, 207, 208, 209, 211, 212, 213, 214, 215, 216, 217, 219, 220, 221, 222, 223,
+        224, 225, 227, 229, 231, 237, 239, 240, 241, 243, 244, 245, 246, 247, 248, 249, 251, 252, 253, 254, 255);
 
-    private static int Mask(byte[] img, int i, int W) =>
-        img[i - W] | img[i - W + 1] << 1 | img[i + 1] << 2 | img[i + W + 1] << 3
-      | img[i + W] << 4 | img[i + W - 1] << 5 | img[i - 1] << 6 | img[i - W - 1] << 7;
-
-    private static bool Bit(int w, int bit) => (w >> bit & 1) == 1;
-
-    private static int Transitions(int w)
-    {
-        int a = 0;
-        for (int i = 0; i < 8; i++)
-            if (!Bit(w, i) && Bit(w, (i + 1) & 7)) a++;
-        return a;
-    }
-
-    private static int Count(int w)
-    {
-        int b = 0;
-        for (int i = 0; i < 8; i++) if (Bit(w, i)) b++;
-        return b;
-    }
-
-    private static readonly bool[] ZsStep1 = BuildZs(0), ZsStep2 = BuildZs(1);
-    private static readonly bool[] GhStep1 = BuildGh(0), GhStep2 = BuildGh(1);
-
-    private static bool[] BuildZs(int step)
-    {
-        var t = new bool[256];
-        for (int w = 0; w < 256; w++)
-        {
-            int p2 = w & 1, p4 = w >> 2 & 1, p6 = w >> 4 & 1, p8 = w >> 6 & 1;
-            int b = Count(w);
-            if (b < 2 || b > 6 || Transitions(w) != 1) continue;
-            t[w] = step == 0
-                ? p2 * p4 * p6 == 0 && p4 * p6 * p8 == 0
-                : p2 * p4 * p8 == 0 && p2 * p6 * p8 == 0;
-        }
-        return t;
-    }
-
-    private static bool[] BuildGh(int step)
-    {
-        var t = new bool[256];
-        for (int w = 0; w < 256; w++)
-        {
-            bool p2 = Bit(w, 0), p3 = Bit(w, 1), p4 = Bit(w, 2), p5 = Bit(w, 3);
-            bool p6 = Bit(w, 4), p7 = Bit(w, 5), p8 = Bit(w, 6), p9 = Bit(w, 7);
-            int c = (!p2 && (p3 || p4) ? 1 : 0) + (!p4 && (p5 || p6) ? 1 : 0)
-                  + (!p6 && (p7 || p8) ? 1 : 0) + (!p8 && (p9 || p2) ? 1 : 0);
-            int n1 = ((p9 || p2) ? 1 : 0) + ((p3 || p4) ? 1 : 0) + ((p5 || p6) ? 1 : 0) + ((p7 || p8) ? 1 : 0);
-            int n2 = ((p2 || p3) ? 1 : 0) + ((p4 || p5) ? 1 : 0) + ((p6 || p7) ? 1 : 0) + ((p8 || p9) ? 1 : 0);
-            int n = Math.Min(n1, n2);
-            if (c != 1 || n < 2 || n > 3) continue;
-            t[w] = step == 0 ? !((p2 || p3 || !p5) && p4) : !((p6 || p7 || !p9) && p8);
-        }
-        return t;
-    }
-
-    private static bool[] Set(params int[] weights)
-    {
-        var t = new bool[256];
-        foreach (int w in weights) t[w] = true;
-        return t;
-    }
-
-    private static readonly bool[] KmmDeletion = Set(3, 5, 7, 12, 13, 14, 15, 20, 21, 22, 23, 28, 29, 30, 31, 48, 52, 53, 54, 55, 56, 60, 61, 62, 63, 65, 67, 69, 71, 77, 79, 80, 81, 83, 84, 85, 86, 87, 88, 89, 91, 92, 93, 94, 95, 97, 99, 101, 103, 109, 111, 112, 113, 115, 116, 117, 118, 119, 120, 121, 123, 124, 125, 126, 127, 131, 133, 135, 141, 143, 149, 151, 157, 159, 181, 183, 189, 191, 192, 193, 195, 197, 199, 205, 207, 208, 209, 211, 212, 213, 214, 215, 216, 217, 219, 220, 221, 222, 223, 224, 225, 227, 229, 231, 237, 239, 240, 241, 243, 244, 245, 246, 247, 248, 249, 251, 252, 253, 254, 255);
-
-    private static readonly bool[] KmmFour = Set(3, 6, 12, 24, 48, 96, 192, 129, 7, 14, 28, 56, 112, 224, 193, 131,
+    private static readonly bool[] KmmContourWithTwoToFourNeighbours = CreateLookupTable(
+        3, 6, 12, 24, 48, 96, 192, 129,
+        7, 14, 28, 56, 112, 224, 193, 131,
         15, 30, 60, 120, 240, 225, 195, 135);
 
-    private static readonly bool[] K3MBorder = Set(3, 6, 7, 12, 14, 15, 24, 28, 30, 31, 48, 56, 60, 62, 63, 96, 112, 120, 124, 126, 127,
-        129, 131, 135, 143, 159, 191, 192, 193, 195, 199, 207, 223, 224, 225, 227, 231, 239, 240, 241, 243, 247, 248, 249, 251, 252, 253, 254);
+    private static readonly bool[] K3MBorderArray = CreateLookupTable(
+        3, 6, 7, 12, 14, 15, 24, 28, 30, 31, 48, 56, 60, 62, 63, 96, 112, 120, 124, 126, 127, 129, 131, 135, 143, 159,
+        191, 192, 193, 195, 199, 207, 223, 224, 225, 227, 231, 239, 240, 241, 243, 247, 248, 249, 251, 252, 253, 254);
 
-    private static readonly bool[] K3MOnePixel = Set(3, 6, 7, 12, 14, 15, 24, 28, 30, 31, 48, 56, 60, 62, 63, 96, 112, 120, 124, 126, 127,
-        129, 131, 135, 143, 159, 191, 192, 193, 195, 199, 207, 223, 224, 225, 227, 231, 239, 240, 241, 243, 247, 248, 249, 251, 252, 253, 254);
+    private static readonly bool[] K3MOnePixelWidthArray = CreateLookupTable(
+        3, 6, 7, 12, 14, 15, 24, 28, 30, 31, 48, 56, 60, 62, 63, 96, 112, 120, 124, 126, 127, 129, 131, 135, 143, 159,
+        191, 192, 193, 195, 199, 207, 223, 224, 225, 227, 231, 239, 240, 241, 243, 247, 248, 249, 251, 252, 253, 254);
 
-    private static readonly bool[][] K3MPhases =
+    private static readonly bool[][] K3MDeletionPhases =
     {
-        Set(7, 14, 28, 56, 112, 131, 193, 224),
-        Set(7, 14, 15, 28, 30, 56, 60, 112, 120, 131, 135, 193, 195, 224, 225, 240),
-        Set(7, 14, 15, 28, 30, 31, 56, 60, 62, 112, 120, 124, 131, 135, 143, 193, 195, 199, 224, 225, 227, 240, 241, 248),
-        Set(7, 14, 15, 28, 30, 31, 56, 60, 62, 63, 112, 120, 124, 126, 131, 135, 143, 159, 193, 195, 199, 207, 224, 225, 227, 231, 240, 241, 243, 248, 249, 252),
-        Set(7, 14, 15, 28, 30, 31, 56, 60, 62, 63, 112, 120, 124, 126, 131, 135, 143, 159, 191, 193, 195, 199, 207, 224, 225, 227, 231, 239, 240, 241, 243, 248, 249, 251, 252, 254),
+        CreateLookupTable(7, 14, 28, 56, 112, 131, 193, 224),
+        CreateLookupTable(7, 14, 15, 28, 30, 56, 60, 112, 120, 131, 135, 193, 195, 224, 225, 240),
+        CreateLookupTable(7, 14, 15, 28, 30, 31, 56, 60, 62, 112, 120, 124, 131, 135, 143, 193, 195, 199, 224, 225, 227,
+            240, 241, 248),
+        CreateLookupTable(7, 14, 15, 28, 30, 31, 56, 60, 62, 63, 112, 120, 124, 126, 131, 135, 143, 159, 193, 195, 199,
+            207, 224, 225, 227, 231, 240, 241, 243, 248, 249, 252),
+        CreateLookupTable(7, 14, 15, 28, 30, 31, 56, 60, 62, 63, 112, 120, 124, 126, 131, 135, 143, 159, 191, 193, 195,
+            199, 207, 224, 225, 227, 231, 239, 240, 241, 243, 248, 249, 251, 252, 254)
     };
 
-    private static byte[] TwoSubIteration(byte[] src, int W, int H, bool[] t1, bool[] t2)
+    public static byte[] Run(ThinningAlgorithm algorithm, byte[] image, int paddedWidth, int paddedHeight)
     {
-        var img = (byte[])src.Clone();
-        var del = new int[img.Length];
-        var tables = new[] { t1, t2 };
-        bool changed;
-        do
+        switch (algorithm)
         {
-            changed = false;
-            foreach (var t in tables)
-            {
-                int n = 0;
-                for (int y = 1; y < H - 1; y++)
-                {
-                    int i = y * W + 1;
-                    for (int x = 1; x < W - 1; x++, i++)
-                        if (img[i] != 0 && t[Mask(img, i, W)]) del[n++] = i;
-                }
-                for (int k = 0; k < n; k++) img[del[k]] = 0;
-                if (n > 0) changed = true;
-            }
-        } while (changed);
-        return img;
-    }
-
-    public static byte[] ZhangSuen(byte[] src, int W, int H) => TwoSubIteration(src, W, H, ZsStep1, ZsStep2);
-
-    public static byte[] GuoHall(byte[] src, int W, int H) => TwoSubIteration(src, W, H, GhStep1, GhStep2);
-
-    private static int MaskNz(byte[] img, int i, int W) =>
-        (img[i - W] + 3 >> 2) | (img[i - W + 1] + 3 >> 2) << 1 | (img[i + 1] + 3 >> 2) << 2 | (img[i + W + 1] + 3 >> 2) << 3
-      | (img[i + W] + 3 >> 2) << 4 | (img[i + W - 1] + 3 >> 2) << 5 | (img[i - 1] + 3 >> 2) << 6 | (img[i - W - 1] + 3 >> 2) << 7;
-
-    public static byte[] Kmm(byte[] src, int W, int H)
-    {
-        var img = (byte[])src.Clone();
-        var contour = new int[img.Length];
-        bool changed;
-        do
-        {
-            changed = false;
-
-            int n = 0;
-            for (int y = 1; y < H - 1; y++)
-            {
-                int i = y * W + 1;
-                for (int x = 1; x < W - 1; x++, i++)
-                {
-                    if (img[i] == 0) continue;
-                    if (img[i - W] == 0 || img[i + 1] == 0 || img[i + W] == 0 || img[i - 1] == 0) img[i] = 2;
-                    else if (img[i - W + 1] == 0 || img[i + W + 1] == 0 || img[i + W - 1] == 0 || img[i - W - 1] == 0) img[i] = 3;
-                    else continue;
-                    contour[n++] = i;
-                }
-            }
-
-            int fours = 0;
-            for (int k = 0; k < n; k++)
-            {
-                int i = contour[k];
-                if (KmmFour[MaskNz(img, i, W)]) contour[fours++] = i;
-            }
-            for (int k = 0; k < fours; k++) img[contour[k]] = 0;
-            if (fours > 0) changed = true;
-
-            for (int label = 2; label <= 3; label++)
-                for (int y = 1; y < H - 1; y++)
-                {
-                    int i = y * W + 1;
-                    for (int x = 1; x < W - 1; x++, i++)
-                    {
-                        if (img[i] != label) continue;
-                        if (KmmDeletion[MaskNz(img, i, W)]) { img[i] = 0; changed = true; }
-                        else img[i] = 1;
-                    }
-                }
-
-        } while (changed);
-        return img;
-    }
-
-    public static byte[] K3M(byte[] src, int W, int H)
-    {
-        var img = (byte[])src.Clone();
-        var border = new int[img.Length];
-        bool changed;
-        do
-        {
-            changed = false;
-            int n = 0;
-            for (int y = 1; y < H - 1; y++)
-            {
-                int i = y * W + 1;
-                for (int x = 1; x < W - 1; x++, i++)
-                    if (img[i] != 0 && K3MBorder[Mask(img, i, W)]) border[n++] = i;
-            }
-
-            foreach (var phase in K3MPhases)
-                for (int k = 0; k < n; k++)
-                {
-                    int i = border[k];
-                    if (img[i] != 0 && phase[Mask(img, i, W)])
-                    {
-                        img[i] = 0;
-                        changed = true;
-                    }
-                }
-        } while (changed);
-
-        for (int y = 1; y < H - 1; y++)
-        {
-            int i = y * W + 1;
-            for (int x = 1; x < W - 1; x++, i++)
-                if (img[i] != 0 && K3MOnePixel[Mask(img, i, W)]) img[i] = 0;
+            case ThinningAlgorithm.ZhangSuen:
+                return ZhangSuen(image, paddedWidth, paddedHeight);
+            case ThinningAlgorithm.GuoHall:
+                return GuoHall(image, paddedWidth, paddedHeight);
+            case ThinningAlgorithm.Kmm:
+                return Kmm(image, paddedWidth, paddedHeight);
+            case ThinningAlgorithm.K3M:
+                return K3M(image, paddedWidth, paddedHeight);
+            default:
+                throw new ArgumentOutOfRangeException(nameof(algorithm));
         }
-        return img;
+    }
+
+    public static byte[] ZhangSuen(byte[] image, int paddedWidth, int paddedHeight)
+    {
+        return ThinWithTwoSubIterations(
+            image, paddedWidth, paddedHeight, ZhangSuenFirstSubIteration, ZhangSuenSecondSubIteration);
+    }
+
+    public static byte[] GuoHall(byte[] image, int paddedWidth, int paddedHeight)
+    {
+        return ThinWithTwoSubIterations(
+            image, paddedWidth, paddedHeight, GuoHallFirstSubIteration, GuoHallSecondSubIteration);
+    }
+
+    public static byte[] Kmm(byte[] image, int paddedWidth, int paddedHeight)
+    {
+        var result = (byte[])image.Clone();
+        var contourPixels = new int[result.Length];
+        var contourLabels = new[] { EdgeContour, CornerContour };
+        bool anyPixelDeleted = true;
+
+        while (anyPixelDeleted)
+        {
+            anyPixelDeleted = false;
+
+            int contourCount = LabelContour(result, paddedWidth, paddedHeight, contourPixels);
+
+            int pixelsToDeleteCount = 0;
+            for (int contourIndex = 0; contourIndex < contourCount; contourIndex++)
+            {
+                int pixelIndex = contourPixels[contourIndex];
+                int weight = GetNonZeroNeighbourhoodWeight(result, pixelIndex, paddedWidth);
+                if (KmmContourWithTwoToFourNeighbours[weight])
+                {
+                    contourPixels[pixelsToDeleteCount] = pixelIndex;
+                    pixelsToDeleteCount++;
+                }
+            }
+
+            for (int deleteIndex = 0; deleteIndex < pixelsToDeleteCount; deleteIndex++)
+            {
+                result[contourPixels[deleteIndex]] = Background;
+            }
+            if (pixelsToDeleteCount > 0)
+            {
+                anyPixelDeleted = true;
+            }
+
+            foreach (byte contourLabel in contourLabels)
+            {
+                for (int y = 1; y < paddedHeight - 1; y++)
+                {
+                    int pixelIndex = y * paddedWidth + 1;
+                    for (int x = 1; x < paddedWidth - 1; x++, pixelIndex++)
+                    {
+                        if (result[pixelIndex] != contourLabel)
+                        {
+                            continue;
+                        }
+
+                        int weight = GetNonZeroNeighbourhoodWeight(result, pixelIndex, paddedWidth);
+                        if (KmmDeletionArray[weight])
+                        {
+                            result[pixelIndex] = Background;
+                            anyPixelDeleted = true;
+                        }
+                        else
+                        {
+                            result[pixelIndex] = Object;
+                        }
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
+    public static byte[] K3M(byte[] image, int paddedWidth, int paddedHeight)
+    {
+        var result = (byte[])image.Clone();
+        var borderPixels = new int[result.Length];
+        bool anyPixelDeleted = true;
+
+        while (anyPixelDeleted)
+        {
+            anyPixelDeleted = false;
+
+            int borderCount = 0;
+            for (int y = 1; y < paddedHeight - 1; y++)
+            {
+                int pixelIndex = y * paddedWidth + 1;
+                for (int x = 1; x < paddedWidth - 1; x++, pixelIndex++)
+                {
+                    if (result[pixelIndex] != Background &&
+                        K3MBorderArray[GetNeighbourhoodWeight(result, pixelIndex, paddedWidth)])
+                    {
+                        borderPixels[borderCount] = pixelIndex;
+                        borderCount++;
+                    }
+                }
+            }
+
+            foreach (bool[] deletionPhase in K3MDeletionPhases)
+            {
+                for (int borderIndex = 0; borderIndex < borderCount; borderIndex++)
+                {
+                    int pixelIndex = borderPixels[borderIndex];
+                    if (result[pixelIndex] != Background &&
+                        deletionPhase[GetNeighbourhoodWeight(result, pixelIndex, paddedWidth)])
+                    {
+                        result[pixelIndex] = Background;
+                        anyPixelDeleted = true;
+                    }
+                }
+            }
+        }
+
+        for (int y = 1; y < paddedHeight - 1; y++)
+        {
+            int pixelIndex = y * paddedWidth + 1;
+            for (int x = 1; x < paddedWidth - 1; x++, pixelIndex++)
+            {
+                if (result[pixelIndex] != Background &&
+                    K3MOnePixelWidthArray[GetNeighbourhoodWeight(result, pixelIndex, paddedWidth)])
+                {
+                    result[pixelIndex] = Background;
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static byte[] ThinWithTwoSubIterations(
+        byte[] image, int paddedWidth, int paddedHeight, bool[] firstSubIteration, bool[] secondSubIteration)
+    {
+        var result = (byte[])image.Clone();
+        var pixelsToDelete = new int[result.Length];
+        var subIterations = new[] { firstSubIteration, secondSubIteration };
+        bool anyPixelDeleted = true;
+
+        while (anyPixelDeleted)
+        {
+            anyPixelDeleted = false;
+
+            foreach (bool[] deletionTable in subIterations)
+            {
+                int pixelsToDeleteCount = 0;
+                for (int y = 1; y < paddedHeight - 1; y++)
+                {
+                    int pixelIndex = y * paddedWidth + 1;
+                    for (int x = 1; x < paddedWidth - 1; x++, pixelIndex++)
+                    {
+                        if (result[pixelIndex] != Background &&
+                            deletionTable[GetNeighbourhoodWeight(result, pixelIndex, paddedWidth)])
+                        {
+                            pixelsToDelete[pixelsToDeleteCount] = pixelIndex;
+                            pixelsToDeleteCount++;
+                        }
+                    }
+                }
+
+                for (int deleteIndex = 0; deleteIndex < pixelsToDeleteCount; deleteIndex++)
+                {
+                    result[pixelsToDelete[deleteIndex]] = Background;
+                }
+
+                if (pixelsToDeleteCount > 0)
+                {
+                    anyPixelDeleted = true;
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static int LabelContour(byte[] image, int paddedWidth, int paddedHeight, int[] contourPixels)
+    {
+        int contourCount = 0;
+        for (int y = 1; y < paddedHeight - 1; y++)
+        {
+            int pixelIndex = y * paddedWidth + 1;
+            for (int x = 1; x < paddedWidth - 1; x++, pixelIndex++)
+            {
+                if (image[pixelIndex] == Background)
+                {
+                    continue;
+                }
+
+                bool touchesBackgroundByEdge =
+                    image[pixelIndex - paddedWidth] == Background || image[pixelIndex + 1] == Background ||
+                    image[pixelIndex + paddedWidth] == Background || image[pixelIndex - 1] == Background;
+                bool touchesBackgroundByCorner =
+                    image[pixelIndex - paddedWidth + 1] == Background || image[pixelIndex + paddedWidth + 1] == Background ||
+                    image[pixelIndex + paddedWidth - 1] == Background || image[pixelIndex - paddedWidth - 1] == Background;
+
+                if (touchesBackgroundByEdge)
+                {
+                    image[pixelIndex] = EdgeContour;
+                }
+                else if (touchesBackgroundByCorner)
+                {
+                    image[pixelIndex] = CornerContour;
+                }
+                else
+                {
+                    continue;
+                }
+
+                contourPixels[contourCount] = pixelIndex;
+                contourCount++;
+            }
+        }
+        return contourCount;
+    }
+
+    private static int GetNeighbourhoodWeight(byte[] image, int pixelIndex, int paddedWidth)
+    {
+        return image[pixelIndex - paddedWidth]
+            | image[pixelIndex - paddedWidth + 1] << 1
+            | image[pixelIndex + 1] << 2
+            | image[pixelIndex + paddedWidth + 1] << 3
+            | image[pixelIndex + paddedWidth] << 4
+            | image[pixelIndex + paddedWidth - 1] << 5
+            | image[pixelIndex - 1] << 6
+            | image[pixelIndex - paddedWidth - 1] << 7;
+    }
+
+    private static int GetNonZeroNeighbourhoodWeight(byte[] image, int pixelIndex, int paddedWidth)
+    {
+        return ToBit(image[pixelIndex - paddedWidth])
+            | ToBit(image[pixelIndex - paddedWidth + 1]) << 1
+            | ToBit(image[pixelIndex + 1]) << 2
+            | ToBit(image[pixelIndex + paddedWidth + 1]) << 3
+            | ToBit(image[pixelIndex + paddedWidth]) << 4
+            | ToBit(image[pixelIndex + paddedWidth - 1]) << 5
+            | ToBit(image[pixelIndex - 1]) << 6
+            | ToBit(image[pixelIndex - paddedWidth - 1]) << 7;
+    }
+
+    private static int ToBit(byte label)
+    {
+        return label + 3 >> 2;
+    }
+
+    private static bool[] BuildZhangSuenTable(bool isFirstSubIteration)
+    {
+        var table = new bool[256];
+        for (int weight = 0; weight < 256; weight++)
+        {
+            int north = weight & 1;
+            int east = weight >> 2 & 1;
+            int south = weight >> 4 & 1;
+            int west = weight >> 6 & 1;
+
+            int neighbourCount = CountNeighbours(weight);
+            if (neighbourCount < 2 || neighbourCount > 6 || CountBackgroundToObjectTransitions(weight) != 1)
+            {
+                continue;
+            }
+
+            if (isFirstSubIteration)
+            {
+                table[weight] = north * east * south == 0 && east * south * west == 0;
+            }
+            else
+            {
+                table[weight] = north * east * west == 0 && north * south * west == 0;
+            }
+        }
+        return table;
+    }
+
+    private static bool[] BuildGuoHallTable(bool isFirstSubIteration)
+    {
+        var table = new bool[256];
+        for (int weight = 0; weight < 256; weight++)
+        {
+            bool north = IsBitSet(weight, 0);
+            bool northEast = IsBitSet(weight, 1);
+            bool east = IsBitSet(weight, 2);
+            bool southEast = IsBitSet(weight, 3);
+            bool south = IsBitSet(weight, 4);
+            bool southWest = IsBitSet(weight, 5);
+            bool west = IsBitSet(weight, 6);
+            bool northWest = IsBitSet(weight, 7);
+
+            int connectivity =
+                (!north && (northEast || east) ? 1 : 0) + (!east && (southEast || south) ? 1 : 0) +
+                (!south && (southWest || west) ? 1 : 0) + (!west && (northWest || north) ? 1 : 0);
+            int pairsStartingAtNorthWest =
+                ((northWest || north) ? 1 : 0) + ((northEast || east) ? 1 : 0) +
+                ((southEast || south) ? 1 : 0) + ((southWest || west) ? 1 : 0);
+            int pairsStartingAtNorth =
+                ((north || northEast) ? 1 : 0) + ((east || southEast) ? 1 : 0) +
+                ((south || southWest) ? 1 : 0) + ((west || northWest) ? 1 : 0);
+            int minimumPairs = Math.Min(pairsStartingAtNorthWest, pairsStartingAtNorth);
+
+            if (connectivity != 1 || minimumPairs < 2 || minimumPairs > 3)
+            {
+                continue;
+            }
+
+            if (isFirstSubIteration)
+            {
+                table[weight] = !((north || northEast || !southEast) && east);
+            }
+            else
+            {
+                table[weight] = !((south || southWest || !northWest) && west);
+            }
+        }
+        return table;
+    }
+
+    private static bool[] CreateLookupTable(params int[] weightsToMark)
+    {
+        var table = new bool[256];
+        foreach (int weight in weightsToMark)
+        {
+            table[weight] = true;
+        }
+        return table;
+    }
+
+    private static bool IsBitSet(int value, int bitIndex)
+    {
+        return (value >> bitIndex & 1) == 1;
+    }
+
+    private static int CountNeighbours(int weight)
+    {
+        int count = 0;
+        for (int bitIndex = 0; bitIndex < 8; bitIndex++)
+        {
+            if (IsBitSet(weight, bitIndex))
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static int CountBackgroundToObjectTransitions(int weight)
+    {
+        int transitions = 0;
+        for (int bitIndex = 0; bitIndex < 8; bitIndex++)
+        {
+            if (!IsBitSet(weight, bitIndex) && IsBitSet(weight, (bitIndex + 1) & 7))
+            {
+                transitions++;
+            }
+        }
+        return transitions;
     }
 }

@@ -1,7 +1,6 @@
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -14,31 +13,11 @@ namespace Szkieletyzacja;
 
 public partial class MainWindow : Window
 {
-    private static readonly string[] Extensions = { ".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff" };
+    private const double ZoomStep = 1.15;
 
-    private byte[]? _gray;
-    private byte[]? _binary;
-    private int _w, _h;
-    private int _W, _H;
-    private string _fileName = "";
-    private bool _syncing, _loading, _running;
+    private static readonly string[] SupportedExtensions = { ".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff" };
 
-    private readonly ObservableCollection<AlgoRow> _rows = new();
-
-    public MainWindow()
-    {
-        InitializeComponent();
-        foreach (ThinningAlgorithm a in Enum.GetValues<ThinningAlgorithm>())
-            _rows.Add(new AlgoRow(a));
-        AlgoList.ItemsSource = _rows;
-        WarmUp();
-        SampleCombo.ItemsSource = Samples;
-        Loaded += (_, _) => SampleCombo.SelectedIndex = 0;
-    }
-
-    private sealed record Sample(string Name, string File);
-
-    private static readonly Sample[] Samples =
+    private static readonly SampleImage[] SampleImages =
     {
         new("Odcisk palca (próbka)", "fp_sample.png"),
         new("Odcisk palca 10_1", "fp_10_1.png"),
@@ -53,228 +32,345 @@ public partial class MainWindow : Window
         new("Kot", "cat.png"),
     };
 
-    private void Sample_Changed(object sender, SelectionChangedEventArgs e)
+    private readonly ObservableCollection<AlgorithmRow> _algorithmRows = new();
+
+    private byte[]? _grayscale;
+    private byte[]? _binary;
+    private int _imageWidth;
+    private int _imageHeight;
+    private int _paddedWidth;
+    private int _paddedHeight;
+    private string _imageName = "";
+    private bool _isSynchronizingScroll;
+    private bool _isSettingThreshold;
+    private bool _isThinningRunning;
+
+    public MainWindow()
     {
-        if (SampleCombo.SelectedItem is not Sample s) return;
-        var bmp = new BitmapImage(new Uri("pack://application:,,,/Assets/" + s.File));
-        bmp.Freeze();
-        LoadImage(bmp, s.Name);
+        InitializeComponent();
+
+        foreach (ThinningAlgorithm algorithm in Enum.GetValues<ThinningAlgorithm>())
+        {
+            _algorithmRows.Add(new AlgorithmRow(algorithm));
+        }
+        AlgoList.ItemsSource = _algorithmRows;
+
+        WarmUpAlgorithms();
+
+        SampleCombo.ItemsSource = SampleImages;
+        Loaded += OnWindowLoaded;
     }
 
-    private static void WarmUp()
+    private void OnWindowLoaded(object sender, RoutedEventArgs e)
     {
-        const int n = 40;
-        var img = new byte[(n + 2) * (n + 2)];
+        SampleCombo.SelectedIndex = 0;
+    }
+
+    private static void WarmUpAlgorithms()
+    {
+        const int imageSize = 40;
+        const int paddedSize = imageSize + 2;
+        var squareImage = new byte[paddedSize * paddedSize];
         for (int y = 5; y < 30; y++)
-            for (int x = 5; x < 30; x++) img[(y + 1) * (n + 2) + x + 1] = 1;
-        foreach (ThinningAlgorithm a in Enum.GetValues<ThinningAlgorithm>())
-            Thinning.Run(a, img, n + 2, n + 2);
+        {
+            for (int x = 5; x < 30; x++)
+            {
+                squareImage[(y + 1) * paddedSize + x + 1] = 1;
+            }
+        }
+
+        foreach (ThinningAlgorithm algorithm in Enum.GetValues<ThinningAlgorithm>())
+        {
+            Thinning.Run(algorithm, squareImage, paddedSize, paddedSize);
+        }
+    }
+
+    private void Sample_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (SampleCombo.SelectedItem is not SampleImage sample)
+        {
+            return;
+        }
+
+        var bitmap = new BitmapImage(new Uri("pack://application:,,,/Assets/" + sample.FileName));
+        bitmap.Freeze();
+        LoadImage(bitmap, sample.Name);
     }
 
     private void Open_Click(object sender, RoutedEventArgs e)
     {
-        var dlg = new OpenFileDialog { Filter = "Obrazy|*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff" };
-        if (dlg.ShowDialog() == true) LoadImage(dlg.FileName);
+        var dialog = new OpenFileDialog { Filter = "Obrazy|*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff" };
+        if (dialog.ShowDialog() == true)
+        {
+            LoadImageFromFile(dialog.FileName);
+        }
     }
 
     private void Window_Drop(object sender, DragEventArgs e)
     {
         if (e.Data.GetData(DataFormats.FileDrop) is string[] files && files.Length > 0)
-            LoadImage(files[0]);
+        {
+            LoadImageFromFile(files[0]);
+        }
     }
 
-    private void LoadImage(string path)
+    private void LoadImageFromFile(string path)
     {
-        if (Array.IndexOf(Extensions, Path.GetExtension(path).ToLowerInvariant()) < 0)
+        string extension = Path.GetExtension(path).ToLowerInvariant();
+        if (Array.IndexOf(SupportedExtensions, extension) < 0)
         {
             StatusText.Text = "Nieobsługiwany format pliku.";
             return;
         }
+
         try
         {
-            var bmp = new BitmapImage();
-            bmp.BeginInit();
-            bmp.CacheOption = BitmapCacheOption.OnLoad;
-            bmp.UriSource = new Uri(path);
-            bmp.EndInit();
-            bmp.Freeze();
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.UriSource = new Uri(path);
+            bitmap.EndInit();
+            bitmap.Freeze();
+
             SampleCombo.SelectedIndex = -1;
-            LoadImage(bmp, Path.GetFileName(path));
+            LoadImage(bitmap, Path.GetFileName(path));
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            StatusText.Text = "Nie udało się wczytać obrazu: " + ex.Message;
+            StatusText.Text = "Nie udało się wczytać obrazu: " + exception.Message;
         }
     }
 
-    private void LoadImage(BitmapSource bmp, string name)
+    private void LoadImage(BitmapSource bitmap, string imageName)
     {
-        _gray = ImageUtils.ToGray(bmp, out _w, out _h);
-        _W = _w + 2; _H = _h + 2;
-        _fileName = name;
+        _grayscale = ImageUtils.ToGrayscale(bitmap, out _imageWidth, out _imageHeight);
+        _paddedWidth = _imageWidth + 2;
+        _paddedHeight = _imageHeight + 2;
+        _imageName = imageName;
 
-        int t = ImageUtils.Otsu(_gray);
-        _loading = true;
-        ThresholdSlider.Value = t;
-        ThresholdText.Text = t.ToString();
-        _loading = false;
-        Rebuild();
+        int otsuThreshold = ImageUtils.ComputeOtsuThreshold(_grayscale);
+        _isSettingThreshold = true;
+        ThresholdSlider.Value = otsuThreshold;
+        ThresholdText.Text = otsuThreshold.ToString();
+        _isSettingThreshold = false;
+
+        Binarize();
         FitToView();
     }
 
     private void Threshold_Changed(object sender, RoutedEventArgs e)
     {
-        if (ThresholdText == null || _loading) return;
+        if (ThresholdText == null || _isSettingThreshold)
+        {
+            return;
+        }
+
         ThresholdText.Text = ((int)ThresholdSlider.Value).ToString();
-        Rebuild();
+        Binarize();
     }
 
     private void Otsu_Click(object sender, RoutedEventArgs e)
     {
-        if (_gray == null) return;
-        ThresholdSlider.Value = ImageUtils.Otsu(_gray);
+        if (_grayscale == null)
+        {
+            return;
+        }
+
+        ThresholdSlider.Value = ImageUtils.ComputeOtsuThreshold(_grayscale);
     }
 
-    private void Rebuild()
+    private void Binarize()
     {
-        if (_gray == null) return;
-        _binary = ImageUtils.BinarizePadded(_gray, _w, _h, (int)ThresholdSlider.Value,
-                                            DarkObjectCheck.IsChecked == true);
-        BinaryImage.Source = ImageUtils.ToBitmap(_binary, _W, _H);
-        foreach (var r in _rows) r.Reset();
+        if (_grayscale == null)
+        {
+            return;
+        }
+
+        _binary = ImageUtils.BinarizeWithPadding(
+            _grayscale, _imageWidth, _imageHeight, (int)ThresholdSlider.Value, DarkObjectCheck.IsChecked == true);
+        BinaryImage.Source = ImageUtils.ToBitmap(_binary, _paddedWidth, _paddedHeight);
+
+        foreach (AlgorithmRow row in _algorithmRows)
+        {
+            row.Reset();
+        }
         ResultImage.Source = null;
         ResultCaption.Text = "Szkielet";
         SaveButton.IsEnabled = false;
-        StartButton.IsEnabled = !_running;
-        int obj = ImageUtils.CountObject(_binary);
-        StatusText.Text = $"{_fileName}  |  {_w}×{_h} px  |  obiekt: {obj} px  |  zaznacz algorytmy i kliknij Start.";
+        StartButton.IsEnabled = !_isThinningRunning;
+
+        int objectPixels = ImageUtils.CountObjectPixels(_binary);
+        StatusText.Text = $"{_imageName}  |  {_imageWidth}×{_imageHeight} px  |  obiekt: {objectPixels} px";
     }
 
     private async void Start_Click(object sender, RoutedEventArgs e)
     {
-        if (_binary == null || _running) return;
-        var chosen = _rows.Where(r => r.Selected).ToList();
-        if (chosen.Count == 0) { StatusText.Text = "Zaznacz co najmniej jeden algorytm."; return; }
+        if (_binary == null || _isThinningRunning)
+        {
+            return;
+        }
 
-        _running = true;
+        List<AlgorithmRow> selectedRows = _algorithmRows.Where(row => row.IsSelected).ToList();
+        if (selectedRows.Count == 0)
+        {
+            StatusText.Text = "Zaznacz co najmniej jeden algorytm.";
+            return;
+        }
+
+        _isThinningRunning = true;
         StartButton.IsEnabled = false;
-        var binary = _binary;
-        int W = _W, H = _H;
-        foreach (var r in chosen) r.Reset();
+        byte[] binary = _binary;
+        int paddedWidth = _paddedWidth;
+        int paddedHeight = _paddedHeight;
 
-        foreach (var row in chosen)
+        foreach (AlgorithmRow row in selectedRows)
+        {
+            row.Reset();
+        }
+
+        foreach (AlgorithmRow row in selectedRows)
         {
             row.Info = "liczę…";
-            var (result, ms) = await Task.Run(() =>
+
+            (byte[] skeleton, double elapsedMilliseconds) = await Task.Run(() =>
             {
-                var sw = Stopwatch.StartNew();
-                var res = Thinning.Run(row.Algorithm, binary, W, H);
-                sw.Stop();
-                return (res, sw.Elapsed.TotalMilliseconds);
+                var stopwatch = Stopwatch.StartNew();
+                byte[] result = Thinning.Run(row.Algorithm, binary, paddedWidth, paddedHeight);
+                stopwatch.Stop();
+                return (result, stopwatch.Elapsed.TotalMilliseconds);
             });
-            row.Result = result;
-            row.Milliseconds = ms;
-            row.Pixels = ImageUtils.CountObject(result);
-            row.Info = $"{ms:F2} ms  |  szkielet: {row.Pixels} px";
+
+            row.Skeleton = skeleton;
+            row.Milliseconds = elapsedMilliseconds;
+            row.SkeletonPixels = ImageUtils.CountObjectPixels(skeleton);
+            row.Info = $"{elapsedMilliseconds:F2} ms  |  szkielet: {row.SkeletonPixels} px";
             AlgoList.SelectedItem = row;
         }
 
-        _running = false;
+        _isThinningRunning = false;
         StartButton.IsEnabled = true;
-        StatusText.Text = $"{_fileName}  |  " + string.Join("   ", chosen.Select(r => $"{r.Name}: {r.Milliseconds:F2} ms"));
+
+        IEnumerable<string> timings = selectedRows.Select(row => $"{row.Name}: {row.Milliseconds:F2} ms");
+        StatusText.Text = $"{_imageName}  |  " + string.Join("   ", timings);
     }
 
-    private void AlgoList_SelectionChanged(object sender, SelectionChangedEventArgs e) => ShowSelected();
-
-    private void Overlay_Click(object sender, RoutedEventArgs e) => ShowSelected();
-
-    private void ShowSelected()
+    private void AlgoList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_binary == null || AlgoList.SelectedItem is not AlgoRow { Result: { } result } row)
+        ShowSelectedSkeleton();
+    }
+
+    private void Overlay_Click(object sender, RoutedEventArgs e)
+    {
+        ShowSelectedSkeleton();
+    }
+
+    private void ShowSelectedSkeleton()
+    {
+        if (_binary == null || AlgoList.SelectedItem is not AlgorithmRow { Skeleton: { } skeleton } row)
         {
             ResultImage.Source = null;
             SaveButton.IsEnabled = false;
             return;
         }
-        ResultImage.Source = OverlayCheck.IsChecked == true
-            ? ImageUtils.ToOverlay(_binary, result, _W, _H, Colors.Red)
-            : ImageUtils.ToBitmap(result, _W, _H);
+
+        if (OverlayCheck.IsChecked == true)
+        {
+            ResultImage.Source = ImageUtils.ToOverlay(_binary, skeleton, _paddedWidth, _paddedHeight, Colors.Red);
+        }
+        else
+        {
+            ResultImage.Source = ImageUtils.ToBitmap(skeleton, _paddedWidth, _paddedHeight);
+        }
         ResultCaption.Text = $"Szkielet — {row.Name} ({row.Milliseconds:F2} ms)";
         SaveButton.IsEnabled = true;
     }
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        if (AlgoList.SelectedItem is not AlgoRow { Result: { } result } row) return;
-        var dlg = new SaveFileDialog
+        if (AlgoList.SelectedItem is not AlgorithmRow { Skeleton: { } skeleton } row)
+        {
+            return;
+        }
+
+        var dialog = new SaveFileDialog
         {
             Filter = "PNG|*.png",
-            FileName = $"{Path.GetFileNameWithoutExtension(_fileName)}_{row.Name}.png"
+            FileName = $"{Path.GetFileNameWithoutExtension(_imageName)}_{row.Name}.png"
         };
-        if (dlg.ShowDialog() != true) return;
-        ImageUtils.SavePng(ImageUtils.ToBitmap(result, _W, _H), dlg.FileName);
-        StatusText.Text = "Zapisano: " + dlg.FileName;
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        ImageUtils.SavePng(ImageUtils.ToBitmap(skeleton, _paddedWidth, _paddedHeight), dialog.FileName);
+        StatusText.Text = "Zapisano: " + dialog.FileName;
     }
 
     private void Zoom_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (ZoomText == null) return;
-        double z = ZoomSlider.Value;
-        ZoomText.Text = $"{z * 100:F0}%";
-        var t = new ScaleTransform(z, z);
-        BinaryImage.LayoutTransform = t;
-        ResultImage.LayoutTransform = t;
+        if (ZoomText == null)
+        {
+            return;
+        }
+
+        double zoom = ZoomSlider.Value;
+        ZoomText.Text = $"{zoom * 100:F0}%";
+        var scale = new ScaleTransform(zoom, zoom);
+        BinaryImage.LayoutTransform = scale;
+        ResultImage.LayoutTransform = scale;
     }
 
-    private void Fit_Click(object sender, RoutedEventArgs e) => FitToView();
+    private void Fit_Click(object sender, RoutedEventArgs e)
+    {
+        FitToView();
+    }
 
-    private void Zoom100_Click(object sender, RoutedEventArgs e) => ZoomSlider.Value = 1;
+    private void Zoom100_Click(object sender, RoutedEventArgs e)
+    {
+        ZoomSlider.Value = 1;
+    }
 
     private void FitToView()
     {
-        if (_gray == null) return;
+        if (_grayscale == null)
+        {
+            return;
+        }
+
         UpdateLayout();
-        double zx = (LeftScroll.ViewportWidth - 2) / _w, zy = (LeftScroll.ViewportHeight - 2) / _h;
-        ZoomSlider.Value = Math.Clamp(Math.Min(zx, zy), ZoomSlider.Minimum, ZoomSlider.Maximum);
+        double zoomToFitWidth = (LeftScroll.ViewportWidth - 2) / _imageWidth;
+        double zoomToFitHeight = (LeftScroll.ViewportHeight - 2) / _imageHeight;
+        double zoom = Math.Min(zoomToFitWidth, zoomToFitHeight);
+        ZoomSlider.Value = Math.Clamp(zoom, ZoomSlider.Minimum, ZoomSlider.Maximum);
     }
 
     private void Scroll_Wheel(object sender, MouseWheelEventArgs e)
     {
-        if (Keyboard.Modifiers != ModifierKeys.Control) return;
-        ZoomSlider.Value = Math.Clamp(ZoomSlider.Value * (e.Delta > 0 ? 1.15 : 1 / 1.15), ZoomSlider.Minimum, ZoomSlider.Maximum);
+        if (Keyboard.Modifiers != ModifierKeys.Control)
+        {
+            return;
+        }
+
+        double zoom = e.Delta > 0 ? ZoomSlider.Value * ZoomStep : ZoomSlider.Value / ZoomStep;
+        ZoomSlider.Value = Math.Clamp(zoom, ZoomSlider.Minimum, ZoomSlider.Maximum);
         e.Handled = true;
     }
 
     private void Scroll_Changed(object sender, ScrollChangedEventArgs e)
     {
-        if (_syncing) return;
-        var from = (ScrollViewer)sender;
-        var to = from == LeftScroll ? RightScroll : LeftScroll;
-        _syncing = true;
-        to.ScrollToHorizontalOffset(from.HorizontalOffset);
-        to.ScrollToVerticalOffset(from.VerticalOffset);
-        _syncing = false;
+        if (_isSynchronizingScroll)
+        {
+            return;
+        }
+
+        var scrolledViewer = (ScrollViewer)sender;
+        ScrollViewer otherViewer = scrolledViewer == LeftScroll ? RightScroll : LeftScroll;
+
+        _isSynchronizingScroll = true;
+        otherViewer.ScrollToHorizontalOffset(scrolledViewer.HorizontalOffset);
+        otherViewer.ScrollToVerticalOffset(scrolledViewer.VerticalOffset);
+        _isSynchronizingScroll = false;
     }
-}
 
-public sealed class AlgoRow : INotifyPropertyChanged
-{
-    private string _info = "—";
-    private bool _selected = true;
-
-    public AlgoRow(ThinningAlgorithm algorithm) { Algorithm = algorithm; }
-
-    public ThinningAlgorithm Algorithm { get; }
-    public string Name => Thinning.Name(Algorithm);
-    public byte[]? Result { get; set; }
-    public double Milliseconds { get; set; }
-    public int Pixels { get; set; }
-
-    public bool Selected { get => _selected; set { _selected = value; Raise(nameof(Selected)); } }
-    public string Info { get => _info; set { _info = value; Raise(nameof(Info)); } }
-
-    public void Reset() { Result = null; Milliseconds = 0; Pixels = 0; Info = "—"; }
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-    private void Raise(string n) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
+    private sealed record SampleImage(string Name, string FileName);
 }

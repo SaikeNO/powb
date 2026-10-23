@@ -6,98 +6,170 @@ namespace Szkieletyzacja;
 
 public static class ImageUtils
 {
-    public static byte[] ToGray(BitmapSource src, out int w, out int h)
+    private const byte ObjectOnPreview = 0;
+    private const byte BackgroundOnPreview = 255;
+    private const byte NonSkeletonObjectOnOverlay = 170;
+
+    public static byte[] ToGrayscale(BitmapSource source, out int width, out int height)
     {
-        var gray = new FormatConvertedBitmap(src, PixelFormats.Gray8, null, 0);
-        w = gray.PixelWidth; h = gray.PixelHeight;
-        var px = new byte[w * h];
-        gray.CopyPixels(px, w, 0);
-        return px;
+        var grayscale = new FormatConvertedBitmap(source, PixelFormats.Gray8, null, 0);
+        width = grayscale.PixelWidth;
+        height = grayscale.PixelHeight;
+
+        var pixels = new byte[width * height];
+        grayscale.CopyPixels(pixels, width, 0);
+        return pixels;
     }
 
-    public static int Otsu(byte[] gray)
+    public static int ComputeOtsuThreshold(byte[] grayscale)
     {
-        var hist = new long[256];
-        foreach (byte g in gray) hist[g]++;
-        double total = gray.Length, sum = 0;
-        for (int i = 0; i < 256; i++) sum += i * (double)hist[i];
-        double sumB = 0, wB = 0, best = -1;
-        int threshold = 128;
-        for (int t = 0; t < 256; t++)
+        var histogram = new long[256];
+        foreach (byte brightness in grayscale)
         {
-            wB += hist[t];
-            if (wB == 0) continue;
-            double wF = total - wB;
-            if (wF == 0) break;
-            sumB += t * (double)hist[t];
-            double d = sumB / wB - (sum - sumB) / wF;
-            double between = wB * wF * d * d;
-            if (between > best) { best = between; threshold = t + 1; }
+            histogram[brightness]++;
         }
-        return threshold;
-    }
 
-    public static byte[] BinarizePadded(byte[] gray, int w, int h, int threshold, bool darkObject)
-    {
-        int W = w + 2;
-        var bin = new byte[W * (h + 2)];
-        for (int y = 0; y < h; y++)
+        double totalPixels = grayscale.Length;
+        double totalBrightnessSum = 0;
+        for (int brightness = 0; brightness < 256; brightness++)
         {
-            int src = y * w, dst = (y + 1) * W + 1;
-            for (int x = 0; x < w; x++)
-                if ((gray[src + x] < threshold) == darkObject) bin[dst + x] = 1;
+            totalBrightnessSum += brightness * (double)histogram[brightness];
         }
-        return bin;
-    }
 
-    public static int CountObject(byte[] padded)
-    {
-        int n = 0;
-        foreach (byte b in padded) n += b;
-        return n;
-    }
+        double darkBrightnessSum = 0;
+        double darkPixels = 0;
+        double bestBetweenClassVariance = -1;
+        int bestThreshold = 128;
 
-    public static BitmapSource ToBitmap(byte[] padded, int W, int H)
-    {
-        int w = W - 2, h = H - 2;
-        var px = new byte[w * h];
-        for (int y = 0; y < h; y++)
+        for (int brightness = 0; brightness < 256; brightness++)
         {
-            int src = (y + 1) * W + 1, dst = y * w;
-            for (int x = 0; x < w; x++)
-                px[dst + x] = padded[src + x] == 1 ? (byte)0 : (byte)255;
-        }
-        var bmp = BitmapSource.Create(w, h, 96, 96, PixelFormats.Gray8, null, px, w);
-        bmp.Freeze();
-        return bmp;
-    }
-
-    public static BitmapSource ToOverlay(byte[] binary, byte[] skeleton, int W, int H, Color skeletonColor)
-    {
-        int w = W - 2, h = H - 2;
-        var px = new byte[w * h * 4];
-        for (int y = 0; y < h; y++)
-        {
-            int src = (y + 1) * W + 1, dst = y * w * 4;
-            for (int x = 0; x < w; x++, dst += 4)
+            darkPixels += histogram[brightness];
+            if (darkPixels == 0)
             {
-                byte b, g, r;
-                if (skeleton[src + x] == 1) { b = skeletonColor.B; g = skeletonColor.G; r = skeletonColor.R; }
-                else if (binary[src + x] == 1) { b = g = r = 170; }
-                else { b = g = r = 255; }
-                px[dst] = b; px[dst + 1] = g; px[dst + 2] = r; px[dst + 3] = 255;
+                continue;
+            }
+
+            double brightPixels = totalPixels - darkPixels;
+            if (brightPixels == 0)
+            {
+                break;
+            }
+
+            darkBrightnessSum += brightness * (double)histogram[brightness];
+            double darkMean = darkBrightnessSum / darkPixels;
+            double brightMean = (totalBrightnessSum - darkBrightnessSum) / brightPixels;
+            double meanDifference = darkMean - brightMean;
+            double betweenClassVariance = darkPixels * brightPixels * meanDifference * meanDifference;
+
+            if (betweenClassVariance > bestBetweenClassVariance)
+            {
+                bestBetweenClassVariance = betweenClassVariance;
+                bestThreshold = brightness + 1;
             }
         }
-        var bmp = BitmapSource.Create(w, h, 96, 96, PixelFormats.Bgra32, null, px, w * 4);
-        bmp.Freeze();
-        return bmp;
+
+        return bestThreshold;
     }
 
-    public static void SavePng(BitmapSource bmp, string path)
+    public static byte[] BinarizeWithPadding(byte[] grayscale, int width, int height, int threshold, bool isObjectDark)
     {
-        var enc = new PngBitmapEncoder();
-        enc.Frames.Add(BitmapFrame.Create(bmp));
-        using var fs = File.Create(path);
-        enc.Save(fs);
+        int paddedWidth = width + 2;
+        var binary = new byte[paddedWidth * (height + 2)];
+
+        for (int y = 0; y < height; y++)
+        {
+            int sourceIndex = y * width;
+            int targetIndex = (y + 1) * paddedWidth + 1;
+            for (int x = 0; x < width; x++)
+            {
+                bool isDark = grayscale[sourceIndex + x] < threshold;
+                if (isDark == isObjectDark)
+                {
+                    binary[targetIndex + x] = 1;
+                }
+            }
+        }
+
+        return binary;
+    }
+
+    public static int CountObjectPixels(byte[] paddedImage)
+    {
+        int count = 0;
+        foreach (byte pixel in paddedImage)
+        {
+            count += pixel;
+        }
+        return count;
+    }
+
+    public static BitmapSource ToBitmap(byte[] paddedImage, int paddedWidth, int paddedHeight)
+    {
+        int width = paddedWidth - 2;
+        int height = paddedHeight - 2;
+        var pixels = new byte[width * height];
+
+        for (int y = 0; y < height; y++)
+        {
+            int sourceIndex = (y + 1) * paddedWidth + 1;
+            int targetIndex = y * width;
+            for (int x = 0; x < width; x++)
+            {
+                pixels[targetIndex + x] = paddedImage[sourceIndex + x] == 1 ? ObjectOnPreview : BackgroundOnPreview;
+            }
+        }
+
+        BitmapSource bitmap = BitmapSource.Create(width, height, 96, 96, PixelFormats.Gray8, null, pixels, width);
+        bitmap.Freeze();
+        return bitmap;
+    }
+
+    public static BitmapSource ToOverlay(
+        byte[] paddedBinary, byte[] paddedSkeleton, int paddedWidth, int paddedHeight, Color skeletonColor)
+    {
+        int width = paddedWidth - 2;
+        int height = paddedHeight - 2;
+        var pixels = new byte[width * height * 4];
+
+        for (int y = 0; y < height; y++)
+        {
+            int sourceIndex = (y + 1) * paddedWidth + 1;
+            int targetIndex = y * width * 4;
+            for (int x = 0; x < width; x++, targetIndex += 4)
+            {
+                byte blue, green, red;
+                if (paddedSkeleton[sourceIndex + x] == 1)
+                {
+                    blue = skeletonColor.B;
+                    green = skeletonColor.G;
+                    red = skeletonColor.R;
+                }
+                else if (paddedBinary[sourceIndex + x] == 1)
+                {
+                    blue = green = red = NonSkeletonObjectOnOverlay;
+                }
+                else
+                {
+                    blue = green = red = BackgroundOnPreview;
+                }
+
+                pixels[targetIndex] = blue;
+                pixels[targetIndex + 1] = green;
+                pixels[targetIndex + 2] = red;
+                pixels[targetIndex + 3] = 255;
+            }
+        }
+
+        BitmapSource bitmap = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixels, width * 4);
+        bitmap.Freeze();
+        return bitmap;
+    }
+
+    public static void SavePng(BitmapSource bitmap, string path)
+    {
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using FileStream stream = File.Create(path);
+        encoder.Save(stream);
     }
 }
