@@ -15,7 +15,6 @@ public static class ImageUtils
         return px;
     }
 
-    /// <summary>Próg Otsu (maksymalizacja wariancji międzyklasowej).</summary>
     public static int Otsu(byte[] gray)
     {
         var hist = new long[256];
@@ -38,7 +37,6 @@ public static class ImageUtils
         return threshold;
     }
 
-    /// <summary>Binaryzacja progowa do tablicy 0/1 z ramką 1 px (rozmiar (w+2)x(h+2)).</summary>
     public static byte[] BinarizePadded(byte[] gray, int w, int h, int threshold, bool darkObject)
     {
         int W = w + 2;
@@ -59,7 +57,6 @@ public static class ImageUtils
         return n;
     }
 
-    /// <summary>Obiekt czarny, tło białe.</summary>
     public static BitmapSource ToBitmap(byte[] padded, int W, int H)
     {
         int w = W - 2, h = H - 2;
@@ -75,7 +72,6 @@ public static class ImageUtils
         return bmp;
     }
 
-    /// <summary>Obraz binarny (jasnoszary obiekt) z naniesionym szkieletem w zadanym kolorze.</summary>
     public static BitmapSource ToOverlay(byte[] binary, byte[] skeleton, int W, int H, Color skeletonColor)
     {
         int w = W - 2, h = H - 2;

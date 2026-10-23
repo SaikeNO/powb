@@ -18,8 +18,8 @@ public partial class MainWindow : Window
 
     private byte[]? _gray;
     private byte[]? _binary;
-    private int _w, _h;          // rozmiar obrazu
-    private int _W, _H;          // rozmiar z ramką
+    private int _w, _h;
+    private int _W, _H;
     private string _fileName = "";
     private bool _syncing, _loading, _running;
 
@@ -61,7 +61,6 @@ public partial class MainWindow : Window
         LoadImage(bmp, s.Name);
     }
 
-    /// <summary>Wstępne uruchomienie na małym obrazie, żeby JIT nie zafałszował pomiarów.</summary>
     private static void WarmUp()
     {
         const int n = 40;
@@ -71,8 +70,6 @@ public partial class MainWindow : Window
         foreach (ThinningAlgorithm a in Enum.GetValues<ThinningAlgorithm>())
             Thinning.Run(a, img, n + 2, n + 2);
     }
-
-    // ---------- ładowanie ----------
 
     private void Open_Click(object sender, RoutedEventArgs e)
     {
@@ -97,7 +94,7 @@ public partial class MainWindow : Window
         {
             var bmp = new BitmapImage();
             bmp.BeginInit();
-            bmp.CacheOption = BitmapCacheOption.OnLoad;   // nie blokuje pliku
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
             bmp.UriSource = new Uri(path);
             bmp.EndInit();
             bmp.Freeze();
@@ -115,9 +112,7 @@ public partial class MainWindow : Window
         _gray = ImageUtils.ToGray(bmp, out _w, out _h);
         _W = _w + 2; _H = _h + 2;
         _fileName = name;
-        DropHint.Visibility = Visibility.Collapsed;
 
-        // domyślny próg automatyczny (Otsu)
         int t = ImageUtils.Otsu(_gray);
         _loading = true;
         ThresholdSlider.Value = t;
@@ -126,8 +121,6 @@ public partial class MainWindow : Window
         Rebuild();
         FitToView();
     }
-
-    // ---------- binaryzacja ----------
 
     private void Threshold_Changed(object sender, RoutedEventArgs e)
     {
@@ -157,8 +150,6 @@ public partial class MainWindow : Window
         StatusText.Text = $"{_fileName}  |  {_w}×{_h} px  |  obiekt: {obj} px  |  zaznacz algorytmy i kliknij Start.";
     }
 
-    // ---------- szkieletyzacja ----------
-
     private async void Start_Click(object sender, RoutedEventArgs e)
     {
         if (_binary == null || _running) return;
@@ -174,7 +165,6 @@ public partial class MainWindow : Window
         foreach (var row in chosen)
         {
             row.Info = "liczę…";
-            // wykonanie poza wątkiem UI; mierzony jest wyłącznie czas samego algorytmu
             var (result, ms) = await Task.Run(() =>
             {
                 var sw = Stopwatch.StartNew();
@@ -186,7 +176,7 @@ public partial class MainWindow : Window
             row.Milliseconds = ms;
             row.Pixels = ImageUtils.CountObject(result);
             row.Info = $"{ms:F2} ms  |  szkielet: {row.Pixels} px";
-            AlgoList.SelectedItem = row;   // pokazuje wynik bieżącego algorytmu
+            AlgoList.SelectedItem = row;
         }
 
         _running = false;
@@ -225,8 +215,6 @@ public partial class MainWindow : Window
         ImageUtils.SavePng(ImageUtils.ToBitmap(result, _W, _H), dlg.FileName);
         StatusText.Text = "Zapisano: " + dlg.FileName;
     }
-
-    // ---------- zoom i przewijanie ----------
 
     private void Zoom_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {

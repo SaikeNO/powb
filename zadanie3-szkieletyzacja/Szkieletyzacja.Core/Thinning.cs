@@ -2,16 +2,8 @@ namespace Szkieletyzacja.Core;
 
 public enum ThinningAlgorithm { ZhangSuen, GuoHall, Kmm, K3M }
 
-/// <summary>
-/// Algorytmy szkieletyzacji. Obraz: tablica 0/1 (1 = obiekt) z ramką 1 px tła dookoła,
-/// więc sąsiadów można czytać bez sprawdzania granic.
-/// Decyzje o usunięciu piksela zapadają w tablicach 256-elementowych indeksowanych maską
-/// sąsiedztwa (jedno obliczenie maski na piksel, brak rozgałęzień w pętli).
-/// </summary>
 public static class Thinning
 {
-    // Sąsiedzi P2..P9 (zgodnie z ruchem wskazówek zegara, od góry) = bity 0..7
-    // wagi: N=1, NE=2, E=4, SE=8, S=16, SW=32, W=64, NW=128
 
     public static string Name(ThinningAlgorithm a) => a switch
     {
@@ -51,8 +43,6 @@ public static class Thinning
         for (int i = 0; i < 8; i++) if (Bit(w, i)) b++;
         return b;
     }
-
-    // ---------- tablice decyzyjne ----------
 
     private static readonly bool[] ZsStep1 = BuildZs(0), ZsStep2 = BuildZs(1);
     private static readonly bool[] GhStep1 = BuildGh(0), GhStep2 = BuildGh(1);
@@ -97,18 +87,14 @@ public static class Thinning
         return t;
     }
 
-    // KMM (Saeed, Rybnik, Tabedzki 2001): Deletion Array z artykulu
     private static readonly bool[] KmmDeletion = Set(3, 5, 7, 12, 13, 14, 15, 20, 21, 22, 23, 28, 29, 30, 31, 48, 52, 53, 54, 55, 56, 60, 61, 62, 63, 65, 67, 69, 71, 77, 79, 80, 81, 83, 84, 85, 86, 87, 88, 89, 91, 92, 93, 94, 95, 97, 99, 101, 103, 109, 111, 112, 113, 115, 116, 117, 118, 119, 120, 121, 123, 124, 125, 126, 127, 131, 133, 135, 141, 143, 149, 151, 157, 159, 181, 183, 189, 191, 192, 193, 195, 197, 199, 205, 207, 208, 209, 211, 212, 213, 214, 215, 216, 217, 219, 220, 221, 222, 223, 224, 225, 227, 229, 231, 237, 239, 240, 241, 243, 244, 245, 246, 247, 248, 249, 251, 252, 253, 254, 255);
 
-    // KMM, krok 3: sumy wag punktow konturu z 2, 3 lub 4 stykajacymi sie sasiadami (3 tablice po 8 wzorcow)
     private static readonly bool[] KmmFour = Set(3, 6, 12, 24, 48, 96, 192, 129, 7, 14, 28, 56, 112, 224, 193, 131,
         15, 30, 60, 120, 240, 225, 195, 135);
 
-    // K3M (Saeed i in. 2010): piksele brzegowe oraz zbiory wag usuwanych w kolejnych fazach
     private static readonly bool[] K3MBorder = Set(3, 6, 7, 12, 14, 15, 24, 28, 30, 31, 48, 56, 60, 62, 63, 96, 112, 120, 124, 126, 127,
         129, 131, 135, 143, 159, 191, 192, 193, 195, 199, 207, 223, 224, 225, 227, 231, 239, 240, 241, 243, 247, 248, 249, 251, 252, 253, 254);
 
-    // A1pix: koncowe wyszczuplenie do szkieletu o grubosci 1 px
     private static readonly bool[] K3MOnePixel = Set(3, 6, 7, 12, 14, 15, 24, 28, 30, 31, 48, 56, 60, 62, 63, 96, 112, 120, 124, 126, 127,
         129, 131, 135, 143, 159, 191, 192, 193, 195, 199, 207, 223, 224, 225, 227, 231, 239, 240, 241, 243, 247, 248, 249, 251, 252, 253, 254);
 
@@ -120,8 +106,6 @@ public static class Thinning
         Set(7, 14, 15, 28, 30, 31, 56, 60, 62, 63, 112, 120, 124, 126, 131, 135, 143, 159, 193, 195, 199, 207, 224, 225, 227, 231, 240, 241, 243, 248, 249, 252),
         Set(7, 14, 15, 28, 30, 31, 56, 60, 62, 63, 112, 120, 124, 126, 131, 135, 143, 159, 191, 193, 195, 199, 207, 224, 225, 227, 231, 239, 240, 241, 243, 248, 249, 251, 252, 254),
     };
-
-    // ---------- algorytmy równoległe (Zhang-Suen, Guo-Hall) ----------
 
     private static byte[] TwoSubIteration(byte[] src, int W, int H, bool[] t1, bool[] t2)
     {
@@ -152,19 +136,10 @@ public static class Thinning
 
     public static byte[] GuoHall(byte[] src, int W, int H) => TwoSubIteration(src, W, H, GhStep1, GhStep2);
 
-    // ---------- KMM ----------
-
-    // etykiety: 0 tlo, 1 obiekt, 2 kontur (styka sie krawedzia z tlem), 3 kontur narozny, 4 do usuniecia
     private static int MaskNz(byte[] img, int i, int W) =>
         (img[i - W] + 3 >> 2) | (img[i - W + 1] + 3 >> 2) << 1 | (img[i + 1] + 3 >> 2) << 2 | (img[i + W + 1] + 3 >> 2) << 3
       | (img[i + W] + 3 >> 2) << 4 | (img[i + W - 1] + 3 >> 2) << 5 | (img[i - 1] + 3 >> 2) << 6 | (img[i - W - 1] + 3 >> 2) << 7;
 
-    /// <summary>
-    /// KMM wg artykulu: (1) kontur z tlem stykajacym sie krawedzia -> 2, narozny -> 3;
-    /// (2) punkty konturu z 2, 3 lub 4 sasiadami -> 4 i usuniecie wszystkich 4;
-    /// (3) dla N=2, potem N=3: piksel o etykiecie N jest usuwany, gdy jego waga jest w Deletion Array,
-    /// w przeciwnym razie wraca do 1. Powtarzane, az nic nie zostanie usuniete (szkielet 1 px).
-    /// </summary>
     public static byte[] Kmm(byte[] src, int W, int H)
     {
         var img = (byte[])src.Clone();
@@ -174,7 +149,6 @@ public static class Thinning
         {
             changed = false;
 
-            // 1-2: etykietowanie konturu
             int n = 0;
             for (int y = 1; y < H - 1; y++)
             {
@@ -189,7 +163,6 @@ public static class Thinning
                 }
             }
 
-            // 3-4: punkty z 2, 3 lub 4 sasiadami -> 4 (decyzja na etykietach sprzed zmiany), potem usuniecie
             int fours = 0;
             for (int k = 0; k < n; k++)
             {
@@ -199,7 +172,6 @@ public static class Thinning
             for (int k = 0; k < fours; k++) img[contour[k]] = 0;
             if (fours > 0) changed = true;
 
-            // 5: sekwencyjna analiza pikseli 2, potem 3
             for (int label = 2; label <= 3; label++)
                 for (int y = 1; y < H - 1; y++)
                 {
@@ -212,18 +184,10 @@ public static class Thinning
                     }
                 }
 
-            // piksele konturu, ktore nie byly 2 ani 3 po kroku 5, juz sa 1
         } while (changed);
         return img;
     }
 
-    // ---------- K3M ----------
-
-    /// <summary>
-    /// K3M wg artykułu: w każdej iteracji faza 0 oznacza piksele brzegowe (A0), fazy 1-5 usuwają oznaczone
-    /// piksele o wagach z A1..A5 (sekwencyjnie, na bieżącym obrazie). Po zakończeniu iteracji
-    /// faza końcowa (A1pix) wyszczupla szkielet do 1 px.
-    /// </summary>
     public static byte[] K3M(byte[] src, int W, int H)
     {
         var img = (byte[])src.Clone();
@@ -252,7 +216,6 @@ public static class Thinning
                 }
         } while (changed);
 
-        // faza koncowa: wyszczuplenie do 1 px tablica A1pix
         for (int y = 1; y < H - 1; y++)
         {
             int i = y * W + 1;

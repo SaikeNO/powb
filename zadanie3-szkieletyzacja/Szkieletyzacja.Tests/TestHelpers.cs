@@ -2,12 +2,11 @@ using System.Text;
 
 namespace Szkieletyzacja.Tests;
 
-/// <summary>Obraz 0/1 z ramką 1 px tła (tak jak oczekują algorytmy). Indeksator używa współrzędnych bez ramki.</summary>
 public sealed class Img
 {
     public byte[] Data { get; }
-    public int W { get; }   // szerokość z ramką
-    public int H { get; }   // wysokość z ramką
+    public int W { get; }
+    public int H { get; }
     public int Width => W - 2;
     public int Height => H - 2;
 
@@ -29,7 +28,6 @@ public sealed class Img
         set => Data[(y + 1) * W + x + 1] = value;
     }
 
-    /// <summary>'#' = obiekt, cokolwiek innego = tło.</summary>
     public static Img FromAscii(params string[] rows)
     {
         var img = new Img(rows[0].Length, rows.Length);
@@ -52,7 +50,6 @@ public sealed class Img
 
     public int Count() => Data.Count(p => p == 1);
 
-    /// <summary>Liczba składowych 8-spójnych obiektu.</summary>
     public int Components()
     {
         var seen = new bool[Data.Length];

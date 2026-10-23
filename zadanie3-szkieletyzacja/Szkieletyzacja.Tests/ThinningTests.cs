@@ -53,11 +53,10 @@ public class ThinningTests
     [Theory, MemberData(nameof(Algorithms))]
     public void ThickHorizontalLine_BecomesThin_AndKeepsMostOfLength(string name, Func<byte[], int, int, byte[]> algo)
     {
-        var img = Img.FilledRect(40, 11, 2, 3, 36, 5);   // 36x5
+        var img = Img.FilledRect(40, 11, 2, 3, 36, 5);
         var res = Run(algo, img);
 
         Assert.Equal(1, res.Components());
-        // w środkowych kolumnach dokładnie 1 piksel szkieletu
         for (int x = 8; x < 32; x++)
         {
             int inColumn = 0;
@@ -121,7 +120,6 @@ public class ThinningTests
         var twice = Run(algo, once);
         if (name == "K3M")
         {
-            // faza A1pix z artykulu skraca konce linii, wiec ponowne przejscie moze zabrac pojedyncze piksele
             Assert.Equal(1, twice.Components());
             for (int i = 0; i < once.Data.Length; i++) Assert.True(twice.Data[i] <= once.Data[i]);
             Assert.True(twice.Count() >= once.Count() - 4);
@@ -143,7 +141,7 @@ public class ThinningTests
                 for (int x = x0; x < x0 + w; x++) img[x, y] = 1;
         }
 
-        algo(img.Data, img.W, img.H);   // rozgrzewka JIT
+        algo(img.Data, img.W, img.H);
         var sw = System.Diagnostics.Stopwatch.StartNew();
         algo(img.Data, img.W, img.H);
         sw.Stop();

@@ -42,7 +42,7 @@
                 <Button x:Name="SaveButton" Content="Zapisz zaznaczony szkielet…" Click="Save_Click" IsEnabled="False"/>
                 <Rectangle Width="1" Fill="#D1D5DB" Margin="4,0,12,0"/>
                 <CheckBox x:Name="OverlayCheck" Content="Nakładka na obraz" VerticalAlignment="Center" Margin="0,0,12,0"
-                          Click="Overlay_Click" ToolTip="Pokaż szkielet (czerwony) na tle obiektu"/>
+                          Click="Overlay_Click"/>
             </WrapPanel>
         </Border>
 
@@ -100,8 +100,6 @@
                     <StackPanel DockPanel.Dock="Bottom" Margin="10">
                         <Button x:Name="StartButton" Content="▶  Start" Click="Start_Click" Margin="0" Padding="12,8"
                                 FontWeight="SemiBold" IsEnabled="False"/>
-                        <TextBlock Text="Zaznaczone algorytmy są wykonywane po kolei na bieżącym obrazie binarnym. Kliknij wiersz, aby zobaczyć wynik."
-                                   TextWrapping="Wrap" Foreground="#6B7280" FontSize="11" Margin="0,8,0,0"/>
                     </StackPanel>
                     <ListBox x:Name="AlgoList" BorderThickness="0" HorizontalContentAlignment="Stretch"
                              SelectionChanged="AlgoList_SelectionChanged">
@@ -123,14 +121,11 @@
                     </ListBox>
                 </DockPanel>
             </Border>
-            <TextBlock x:Name="DropHint" Grid.ColumnSpan="5" HorizontalAlignment="Center" VerticalAlignment="Center"
-                       Text="Przeciągnij tu obraz lub kliknij „Otwórz obraz…”" FontSize="18" Foreground="#9CA3AF"
-                       IsHitTestVisible="False"/>
         </Grid>
 
         <Border Grid.Row="3" Style="{StaticResource Card}" Padding="10,6" Margin="0,8,0,0">
             <TextBlock x:Name="StatusText" Foreground="#374151" TextWrapping="Wrap"
-                       Text="Otwórz obraz, aby rozpocząć. Ctrl + kółko myszy = powiększenie."/>
+                       Text=""/>
         </Border>
     </Grid>
 </Window>
