@@ -247,26 +247,26 @@ public static class Thinning
 
     private static int GetNeighbourhoodWeight(byte[] image, int pixelIndex, int paddedWidth)
     {
-        return image[pixelIndex - paddedWidth]            // N  = 1   (piksel nad nami)
-            | image[pixelIndex - paddedWidth + 1] << 1    // NE = 2
-            | image[pixelIndex + 1] << 2                  // E  = 4   (piksel po prawej)
-            | image[pixelIndex + paddedWidth + 1] << 3    // SE = 8
-            | image[pixelIndex + paddedWidth] << 4        // S  = 16  (piksel pod nami)
-            | image[pixelIndex + paddedWidth - 1] << 5    // SW = 32
-            | image[pixelIndex - 1] << 6                  // W  = 64  (piksel po lewej)
-            | image[pixelIndex - paddedWidth - 1] << 7;   // NW = 128
+        return image[pixelIndex - paddedWidth]  // N  = 1
+            + (image[pixelIndex - paddedWidth + 1] << 1)  // NE = 2
+            + (image[pixelIndex + 1] << 2)  // E  = 4
+            + (image[pixelIndex + paddedWidth + 1] << 3)  // SE = 8
+            + (image[pixelIndex + paddedWidth] << 4)  // S  = 16
+            + (image[pixelIndex + paddedWidth - 1] << 5)  // SW = 32
+            + (image[pixelIndex - 1] << 6)  // W  = 64
+            + (image[pixelIndex - paddedWidth - 1] << 7);  // NW = 128
     }
 
     private static int GetNonZeroNeighbourhoodWeight(byte[] image, int pixelIndex, int paddedWidth)
     {
         return ToBit(image[pixelIndex - paddedWidth])
-            | ToBit(image[pixelIndex - paddedWidth + 1]) << 1
-            | ToBit(image[pixelIndex + 1]) << 2
-            | ToBit(image[pixelIndex + paddedWidth + 1]) << 3
-            | ToBit(image[pixelIndex + paddedWidth]) << 4
-            | ToBit(image[pixelIndex + paddedWidth - 1]) << 5
-            | ToBit(image[pixelIndex - 1]) << 6
-            | ToBit(image[pixelIndex - paddedWidth - 1]) << 7;
+            + (ToBit(image[pixelIndex - paddedWidth + 1]) << 1)
+            + (ToBit(image[pixelIndex + 1]) << 2)
+            + (ToBit(image[pixelIndex + paddedWidth + 1]) << 3)
+            + (ToBit(image[pixelIndex + paddedWidth]) << 4)
+            + (ToBit(image[pixelIndex + paddedWidth - 1]) << 5)
+            + (ToBit(image[pixelIndex - 1]) << 6)
+            + (ToBit(image[pixelIndex - paddedWidth - 1]) << 7);
     }
 
     private static int ToBit(byte label)
