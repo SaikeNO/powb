@@ -35,7 +35,10 @@
 
         <Border Grid.Row="0" Style="{StaticResource Card}" Padding="10" Margin="0,0,0,8">
             <WrapPanel>
-                <Button Content="Otwórz obraz…" Click="Open_Click"/>
+                <TextBlock Text="Obraz testowy:" Style="{StaticResource Label}"/>
+                <ComboBox x:Name="SampleCombo" Width="210" Margin="0,0,8,0" DisplayMemberPath="Name"
+                          SelectionChanged="Sample_Changed"/>
+                <Button Content="Otwórz własny obraz…" Click="Open_Click"/>
                 <Button x:Name="SaveButton" Content="Zapisz zaznaczony szkielet…" Click="Save_Click" IsEnabled="False"/>
                 <Rectangle Width="1" Fill="#D1D5DB" Margin="4,0,12,0"/>
                 <CheckBox x:Name="OverlayCheck" Content="Nakładka na obraz" VerticalAlignment="Center" Margin="0,0,12,0"

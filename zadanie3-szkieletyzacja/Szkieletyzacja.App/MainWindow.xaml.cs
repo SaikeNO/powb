@@ -32,7 +32,33 @@ public partial class MainWindow : Window
             _rows.Add(new AlgoRow(a));
         AlgoList.ItemsSource = _rows;
         WarmUp();
-        Loaded += (_, _) => LoadImage(new BitmapImage(new Uri("pack://application:,,,/Assets/sample.png")), "przykład: odcisk palca");
+        SampleCombo.ItemsSource = Samples;
+        Loaded += (_, _) => SampleCombo.SelectedIndex = 0;
+    }
+
+    private sealed record Sample(string Name, string File);
+
+    private static readonly Sample[] Samples =
+    {
+        new("Odcisk palca (próbka)", "fp_sample.png"),
+        new("Odcisk palca 10_1", "fp_10_1.png"),
+        new("Odcisk palca 1_1", "fp_1_1.png"),
+        new("Odcisk palca 5_3", "fp_5_3.png"),
+        new("Odcisk palca 12_2", "fp_12_2.png"),
+        new("Kod QR", "qr.png"),
+        new("Pismo odręczne 1", "handwritten.jpg"),
+        new("Pismo odręczne 2", "handwritten2.jpg"),
+        new("Tekst drukowany", "printed.jpg"),
+        new("Jabłko", "apple.png"),
+        new("Kot", "cat.png"),
+    };
+
+    private void Sample_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (SampleCombo.SelectedItem is not Sample s) return;
+        var bmp = new BitmapImage(new Uri("pack://application:,,,/Assets/" + s.File));
+        bmp.Freeze();
+        LoadImage(bmp, s.Name);
     }
 
     /// <summary>Wstępne uruchomienie na małym obrazie, żeby JIT nie zafałszował pomiarów.</summary>
@@ -75,6 +101,7 @@ public partial class MainWindow : Window
             bmp.UriSource = new Uri(path);
             bmp.EndInit();
             bmp.Freeze();
+            SampleCombo.SelectedIndex = -1;
             LoadImage(bmp, Path.GetFileName(path));
         }
         catch (Exception ex)

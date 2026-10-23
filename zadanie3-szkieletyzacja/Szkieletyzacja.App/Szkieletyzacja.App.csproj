@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <Resource Include="Assets\sample.png" />
+    <Resource Include="Assets\*.png;Assets\*.jpg" />
     <ProjectReference Include="..\Szkieletyzacja.Core\Szkieletyzacja.Core.csproj" />
   </ItemGroup>
 

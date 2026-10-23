@@ -18,7 +18,7 @@ Projects: `Szkieletyzacja.Core` (`net10.0`) contains the algorithms, `Szkieletyz
 
 1. Open an image (button or drag & drop; PNG, JPEG, BMP, TIFF). It is binarized with the Otsu threshold automatically.
 2. Adjust the **threshold** / **dark object** if needed. 
-3. A sample fingerprint is loaded at start. Tick any algorithms and press **Start**: they run one after another and each row shows its real execution time (algorithm only, after a JIT warm-up) and skeleton size. Click a row to view its result, toggle the **overlay** (skeleton in red over the shape), zoom with the slider or Ctrl+wheel (both previews scroll together), **Save** writes the selected skeleton as PNG.
+3. Sample images (fingerprints, QR code, handwriting, print) are bundled and chosen from the **Test image** list; the first one loads at start. Tick any algorithms and press **Start**: they run one after another and each row shows its real execution time (algorithm only, after a JIT warm-up) and skeleton size. Click a row to view its result, toggle the **overlay** (skeleton in red over the shape), zoom with the slider or Ctrl+wheel (both previews scroll together), **Save** writes the selected skeleton as PNG.
 
 Good test images: fingerprints, clean drawings, QR codes. Photos without clear shapes produce noise rather than a useful skeleton.
 
