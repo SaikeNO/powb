@@ -84,20 +84,20 @@ public static class MagicWand
             throw new ArgumentException("Selection dimensions do not match.", nameof(selection));
         var result = new byte[count];
         for (int y = 0; y < height; y++)
-        for (int x = 0; x < width; x++)
-        {
-            bool any = false, all = true;
-            for (int dy = -1; dy <= 1; dy++)
-            for (int dx = -1; dx <= 1; dx++)
+            for (int x = 0; x < width; x++)
             {
-                int nx = x + dx, ny = y + dy;
-                bool value = nx >= 0 && ny >= 0 && nx < width && ny < height
-                    && selection[ny * width + nx] != 0;
-                any |= value;
-                all &= value;
+                bool any = false, all = true;
+                for (int dy = -1; dy <= 1; dy++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        int nx = x + dx, ny = y + dy;
+                        bool value = nx >= 0 && ny >= 0 && nx < width && ny < height
+                            && selection[ny * width + nx] != 0;
+                        any |= value;
+                        all &= value;
+                    }
+                result[y * width + x] = (byte)((dilate ? any : all) ? 1 : 0);
             }
-            result[y * width + x] = (byte)((dilate ? any : all) ? 1 : 0);
-        }
         return result;
     }
 
