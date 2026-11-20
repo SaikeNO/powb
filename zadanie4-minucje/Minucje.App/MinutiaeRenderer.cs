@@ -38,7 +38,7 @@ public static class MinutiaeRenderer
             {
                 if (visibleReasons.Contains(rejected.Reason))
                 {
-                    Legend.DrawRejectedMarker(context, CenterOf(rejected.Minutia), 4 * Scale);
+                    Legend.DrawRejectedMarker(context, CenterOf(rejected.Minutia), 5 * Scale);
                 }
             }
 
