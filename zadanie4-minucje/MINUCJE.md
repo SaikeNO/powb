@@ -135,6 +135,23 @@ Odrzucamy obie minucje z pary. Na obrazie odrzucone są pokazane jako szare ×, 
 
 Prawdziwe minucje leżą w podobnych miejscach na obu odciskach, co widać, kładąc obrazy obok siebie.
 
+## Czy to działa poprawnie? (sprawdzone na wszystkich 128 odciskach z `Fingerprints`)
+
+| Co sprawdzono | Wynik |
+|---|---|
+| K3M nie przerywa ani nie skleja linii | liczba osobnych linii przed i po szkieletyzacji jest taka sama na 128/128 odciskach |
+| szkielet ma grubość 1 piksela | tylko 36 miejsc z blokiem 2×2 na 128 obrazów, bez wpływu na CN |
+| próg 8 px ma sens | średni odstęp między liniami wynosi 7-8,5 px, więc 8 px to jeden odstęp |
+| filtr usuwa prawdziwe ostrogi i mostki, a nie przypadkowe pary | 97% odrzuconych ostróg i 99,9% mostków jest naprawdę połączonych linią szkieletu |
+| wynik na odcisk | średnio 40 minucji: 76% zakończeń, 23% rozwidleń, pojedyncze skrzyżowania i punkty |
+
+**Czego program celowo nie robi** (nie jest wymagane w zadaniu):
+- **kierunku minucji** (kąt linii), który jest potrzebny dopiero przy dopasowywaniu odcisków,
+- **punktów osobliwych** (rdzeń i delta), bo to cechy całego wzoru, a nie minucje,
+- **wzmocnienia obrazu filtrami Gabora**. Bez niego na słabych odciskach (np. 5_3) zostaje więcej fałszywych zakończeń.
+
+Złożone minucje (jeziorko, wysepka, ostroga, mostek) to połączenia zakończeń i rozwidleń, więc CN znajduje je jako te podstawowe typy. Jeśli są bardzo małe, filtr uznaje je za szum.
+
 ## Pytania, które mogą paść
 
 - **Dlaczego trzeba robić szkielet?** CN zakłada linię grubości 1 piksela. Na grubej linii piksel ma za dużo sąsiadów i wynik nie odpowiada liczbie gałęzi.
