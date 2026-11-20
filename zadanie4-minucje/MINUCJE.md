@@ -21,7 +21,7 @@ obraz (jasność 0-255)
 lista minucji + lista odrzuconych (z przyczyną)
 ```
 
-W aplikacji można przełączyć **Widok** (oryginał / szkielet / binarny) i zobaczyć wynik kroków 2 i 3.
+W aplikacji można przełączyć **Widok** (oryginał / szkielet / binarny) i zobaczyć wynik kroków 2 i 3. Checkboxy przy typach w tabeli pokazują lub ukrywają dany typ minucji na obu obrazach.
 
 ## Pliki w kolejności omawiania
 
@@ -44,7 +44,7 @@ W aplikacji można przełączyć **Widok** (oryginał / szkielet / binarny) i zo
 | `MainWindow.xaml` | wygląd okna |
 | `MainWindow.xaml.cs` | obsługa przycisków: wczytaj, przelicz, narysuj, uzupełnij tabelę |
 | `MinutiaeRenderer.cs` | rysuje obraz i znaczniki minucji |
-| `Legend.cs` | kolory, kształty i polskie nazwy minucji |
+| `Legend.cs` | kolory i polskie nazwy minucji |
 | `ImageConversion.cs` | obraz → tablica jasności, zapis PNG |
 
 ## 1. Jak zapisany jest obraz (`Neighbourhood.cs`)
@@ -94,11 +94,11 @@ return sum / 2;
 
 | CN | Ile linii wychodzi | Typ | Znacznik |
 |---|---|---|---|
-| 0 | żadna | punkt izolowany | pomarańczowy trójkąt |
-| 1 | jedna | **zakończenie** | czerwone kółko |
+| 0 | żadna | punkt izolowany | zielony okrąg |
+| 1 | jedna | **zakończenie** | czerwony okrąg |
 | 2 | dwie (wchodzi i wychodzi) | zwykły punkt linii, *nie minucja* | brak |
-| 3 | trzy | **rozwidlenie** | niebieski kwadrat |
-| 4 | cztery | skrzyżowanie | fioletowy romb |
+| 3 | trzy | **rozwidlenie** | niebieski okrąg |
+| 4 | cztery | skrzyżowanie | fioletowy okrąg |
 
 Przykład dla rozwidlenia (`#` = linia):
 

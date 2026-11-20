@@ -55,19 +55,24 @@
             </Setter>
         </Style>
 
-        <!-- wiersz tabeli liczności: ikona | nazwa | CN | A | B -->
+        <!-- wiersz tabeli liczności: checkbox + kolor | nazwa | CN | A | B -->
         <DataTemplate x:Key="CountRowTemplate">
             <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="0,5"
                     ToolTip="{Binding ToolTip}" Background="Transparent">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="24"/>
+                        <ColumnDefinition Width="44"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="40"/>
-                        <ColumnDefinition Width="44"/>
-                        <ColumnDefinition Width="44"/>
+                        <ColumnDefinition Width="30"/>
+                        <ColumnDefinition Width="38"/>
+                        <ColumnDefinition Width="38"/>
                     </Grid.ColumnDefinitions>
-                    <Image Source="{Binding Icon}" Width="16" Height="16" HorizontalAlignment="Left"/>
+                    <StackPanel Orientation="Horizontal">
+                        <CheckBox x:Name="ShowCheck" Tag="{Binding Type}" IsChecked="{Binding IsVisible, Mode=OneWay}"
+                                  Checked="TypeVisibility_Changed" Unchecked="TypeVisibility_Changed" VerticalAlignment="Center" Margin="0,0,4,0"
+                                  ToolTip="Pokaż ten typ na obrazach"/>
+                        <Image Source="{Binding Icon}" Width="16" Height="16"/>
+                    </StackPanel>
                     <TextBlock x:Name="NameText" Grid.Column="1" Text="{Binding Name}"/>
                     <TextBlock Grid.Column="2" Text="{Binding Detail}" Foreground="{StaticResource MutedBrush}"
                                HorizontalAlignment="Right"/>
@@ -76,6 +81,9 @@
                 </Grid>
             </Border>
             <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding HasCheckBox}" Value="False">
+                    <Setter TargetName="ShowCheck" Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
                 <DataTrigger Binding="{Binding IsTotal}" Value="True">
                     <Setter TargetName="NameText" Property="FontWeight" Value="SemiBold"/>
                     <Setter TargetName="AText" Property="FontWeight" Value="SemiBold"/>
@@ -155,12 +163,13 @@
                     <TextBlock Text="Liczba minucji" Style="{StaticResource SectionTitle}"/>
                     <Grid Margin="0,0,0,2">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="24"/>
+                            <ColumnDefinition Width="44"/>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="40"/>
-                            <ColumnDefinition Width="44"/>
-                            <ColumnDefinition Width="44"/>
+                            <ColumnDefinition Width="30"/>
+                            <ColumnDefinition Width="38"/>
+                            <ColumnDefinition Width="38"/>
                         </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Pokaż" Style="{StaticResource Muted}"/>
                         <TextBlock Grid.Column="1" Text="Typ" Style="{StaticResource Muted}"/>
                         <TextBlock Grid.Column="2" Text="CN" Style="{StaticResource Muted}" HorizontalAlignment="Right"/>
                         <TextBlock Grid.Column="3" Text="A" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"

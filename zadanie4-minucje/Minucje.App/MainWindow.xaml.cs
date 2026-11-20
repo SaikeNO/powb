@@ -31,6 +31,9 @@ public partial class MainWindow : Window
     private readonly FingerprintPanel _panelB;
     private bool _isReady;
 
+    // typy minucji rysowane na obrazie (checkboxy w tabeli); na start wszystkie
+    private readonly HashSet<MinutiaType> _visibleTypes = new(Enum.GetValues<MinutiaType>());
+
     public MainWindow()
     {
         InitializeComponent();
@@ -165,7 +168,7 @@ public partial class MainWindow : Window
         }
 
         panel.Image.Source = MinutiaeRenderer.Render(
-            panel.Result, panel.Grayscale, CurrentViewMode(), ShowRejectedCheck.IsChecked == true);
+            panel.Result, panel.Grayscale, CurrentViewMode(), ShowRejectedCheck.IsChecked == true, _visibleTypes);
         panel.Info.Text = $"{panel.Result.Minutiae.Count} minucji  ·  {panel.Name}  ·  {panel.Width}×{panel.Height} px";
     }
 
@@ -199,6 +202,18 @@ public partial class MainWindow : Window
         }
     }
 
+    // checkbox przy typie minucji: pokaż / ukryj ten typ na obu obrazach
+    private void TypeVisibility_Changed(object sender, RoutedEventArgs e)
+    {
+        var checkBox = (CheckBox)sender;
+        var type = (MinutiaType)checkBox.Tag;
+        bool changed = checkBox.IsChecked == true ? _visibleTypes.Add(type) : _visibleTypes.Remove(type);
+        if (changed)
+        {
+            View_Changed(sender, e); // rysujemy od nowa tylko gdy coś się zmieniło
+        }
+    }
+
     // ---------- tabele po prawej ----------
 
     private void UpdateTables()
@@ -210,7 +225,11 @@ public partial class MainWindow : Window
         foreach (MinutiaType type in Enum.GetValues<MinutiaType>())
         {
             counts.Add(new TableRow(Legend.MarkerIcon(type), Legend.NameOf(type), Legend.CrossingNumberOf(type),
-                a?.Count(type), b?.Count(type), IsTotal: false, Legend.DescriptionOf(type)));
+                a?.Count(type), b?.Count(type), IsTotal: false, Legend.DescriptionOf(type))
+            {
+                Type = type,
+                IsVisible = _visibleTypes.Contains(type),
+            });
         }
         counts.Add(new TableRow(null, "Razem", "", a?.Minutiae.Count, b?.Minutiae.Count, IsTotal: true, null));
         CountsList.ItemsSource = counts;
@@ -264,6 +283,13 @@ public partial class MainWindow : Window
         public string A => CountA?.ToString() ?? "—";
 
         public string B => CountB?.ToString() ?? "—";
+
+        // tylko wiersze z typem minucji mają checkbox "pokaż na obrazie"
+        public MinutiaType? Type { get; init; }
+
+        public bool IsVisible { get; init; }
+
+        public bool HasCheckBox => Type != null;
     }
 
     // stan jednego z dwóch paneli: kontrolki + wczytany obraz + wynik analizy

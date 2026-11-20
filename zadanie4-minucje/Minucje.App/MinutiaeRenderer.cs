@@ -20,7 +20,9 @@ public static class MinutiaeRenderer
     private static readonly Color OutsideFingerprint = Color.FromRgb(240, 228, 186);  // tło skanera - żółtawe
     private static readonly Color RidgeOnSkeletonView = Color.FromRgb(209, 213, 219);
 
-    public static BitmapSource Render(FingerprintAnalysis analysis, byte[] grayscale, ViewMode mode, bool showRejected)
+    // visibleTypes: typy minucji zaznaczone w tabeli (checkboxy), tylko te są rysowane
+    public static BitmapSource Render(FingerprintAnalysis analysis, byte[] grayscale, ViewMode mode, bool showRejected,
+        ISet<MinutiaType> visibleTypes)
     {
         var visual = new DrawingVisual();
         RenderOptions.SetBitmapScalingMode(visual, BitmapScalingMode.NearestNeighbor);
@@ -40,9 +42,14 @@ public static class MinutiaeRenderer
                 }
             }
 
-            // 3. minucje: piksel minucji wypełniony kolorem + znacznik wokół
+            // 3. minucje: piksel minucji wypełniony kolorem + kolorowy okrąg wokół
             foreach (Minutia minutia in analysis.Minutiae)
             {
+                if (!visibleTypes.Contains(minutia.Type))
+                {
+                    continue;
+                }
+
                 var pixel = new Rect(minutia.X * Scale, minutia.Y * Scale, Scale, Scale);
                 context.DrawRectangle(new SolidColorBrush(Legend.ColorOf(minutia.Type)), null, pixel);
                 Legend.DrawMarker(context, minutia.Type, CenterOf(minutia), 5 * Scale);

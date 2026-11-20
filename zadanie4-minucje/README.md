@@ -19,8 +19,8 @@ Projects: `Minucje.Core` (`net10.0`) contains the algorithms, `Minucje.App` (`ne
 ## Using the app
 
 - Fingerprints **A** (`1_1`) and **B** (`1_2`, the same finger) load at start. Pick another sample from the list, use **Open…**, or drag an image onto a panel.
-- Minutiae are marked as follows: ending = red circle, bifurcation = blue square, crossing = purple diamond, isolated point = orange triangle.
-- The right panel shows the number of each minutia type for A and B. Hover a row to see what that type means.
+- Each minutia is marked with a coloured circle: ending = red, bifurcation = blue, crossing = purple, isolated point = green.
+- The right panel shows the number of each minutia type for A and B. The checkbox next to a type shows or hides it on both images. Hover a row to see what that type means.
 - **False minutiae**: turn the filter on or off, set the border margin and the minimum distance, and show or hide the rejected minutiae (grey ×). The area outside the fingerprint is tinted yellow.
 - **View**: original, skeleton or binary image. **Save…** writes the marked image as PNG.
 
