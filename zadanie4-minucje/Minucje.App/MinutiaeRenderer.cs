@@ -8,7 +8,7 @@ namespace Minucje;
 public enum ViewMode
 {
     Original,  // zdjęcie odcisku
-    Skeleton,  // szkielet na czarno, linie z obrazu binarnego na szaro
+    Skeleton,  // szkielet: linie grubości 1 piksela
     Binary,    // obraz po binaryzacji
 }
 
@@ -18,7 +18,6 @@ public static class MinutiaeRenderer
 {
     private const int Scale = 3;
     private static readonly Color OutsideFingerprint = Color.FromRgb(240, 228, 186);  // tło skanera - żółtawe
-    private static readonly Color RidgeOnSkeletonView = Color.FromRgb(209, 213, 219);
 
     // visibleTypes / visibleReasons: co jest zaznaczone checkboxami w tabelach, tylko to jest rysowane
     public static BitmapSource Render(FingerprintAnalysis analysis, byte[] grayscale, ViewMode mode,
@@ -106,11 +105,7 @@ public static class MinutiaeRenderer
             case ViewMode.Binary:
                 return isRidge ? Colors.Black : Colors.White;
             case ViewMode.Skeleton:
-                if (isSkeleton)
-                {
-                    return Colors.Black;
-                }
-                return isRidge ? RidgeOnSkeletonView : Colors.White;
+                return isSkeleton ? Colors.Black : Colors.White;
             default:
                 return Color.FromRgb(brightness, brightness, brightness);
         }
