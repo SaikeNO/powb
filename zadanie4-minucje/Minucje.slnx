@@ -1,0 +1,10 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="Minucje.App/Minucje.App.csproj" />
+  <Project Path="Minucje.Core/Minucje.Core.csproj" />
+  <Project Path="Minucje.Tests/Minucje.Tests.csproj" />
+</Solution>
