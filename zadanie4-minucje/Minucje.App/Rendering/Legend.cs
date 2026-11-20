@@ -1,8 +1,8 @@
 using System.Windows;
 using System.Windows.Media;
-using Minucje.Core;
+using Minucje.Core.Models;
 
-namespace Minucje;
+namespace Minucje.Rendering;
 
 // Wygląd i nazwy minucji: kolor znacznika, polska nazwa i opis do podpowiedzi.
 // Te same znaczniki rysuje MinutiaeRenderer na obrazie i tabela po prawej jako ikony.
@@ -91,10 +91,10 @@ public static class Legend
         DrawCross(context, new Pen(new SolidColorBrush(RejectedColor), thickness), center, size / 2);
     }
 
-    private static void DrawCross(DrawingContext context, Pen pen, Point center, double r)
+    private static void DrawCross(DrawingContext context, Pen pen, Point center, double halfSize)
     {
-        context.DrawLine(pen, new Point(center.X - r, center.Y - r), new Point(center.X + r, center.Y + r));
-        context.DrawLine(pen, new Point(center.X - r, center.Y + r), new Point(center.X + r, center.Y - r));
+        context.DrawLine(pen, new Point(center.X - halfSize, center.Y - halfSize), new Point(center.X + halfSize, center.Y + halfSize));
+        context.DrawLine(pen, new Point(center.X - halfSize, center.Y + halfSize), new Point(center.X + halfSize, center.Y - halfSize));
     }
 
     public static ImageSource MarkerIcon(MinutiaType type)

@@ -2,7 +2,7 @@ using System.IO;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
-namespace Minucje;
+namespace Minucje.Imaging;
 
 // zamiana obrazu WPF na tablicę jasności 0-255 i zapis PNG
 public static class ImageConversion

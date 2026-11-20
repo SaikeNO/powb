@@ -1,23 +1,17 @@
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using Minucje.Core;
+using Minucje.Core.Analysis;
+using Minucje.Core.Models;
 
-namespace Minucje;
-
-public enum ViewMode
-{
-    Original,  // zdjęcie odcisku
-    Skeleton,  // szkielet: linie grubości 1 piksela
-    Binary,    // obraz po binaryzacji
-}
+namespace Minucje.Rendering;
 
 // Rysuje odcisk z zaznaczonymi minucjami.
 // Obraz jest powiększany 3 razy, żeby znaczniki były czytelne na małych odciskach (ok. 250×340 px).
 public static class MinutiaeRenderer
 {
     private const int Scale = 3;
-    private static readonly Color OutsideFingerprint = Color.FromRgb(240, 228, 186);  // tło skanera - żółtawe
+    private static readonly Color ScannerBackgroundTint = Color.FromRgb(240, 228, 186);  // tło skanera - żółtawe
 
     // visibleTypes / visibleReasons: co jest zaznaczone checkboxami w tabelach, tylko to jest rysowane
     public static BitmapSource Render(FingerprintAnalysis analysis, byte[] grayscale, ViewMode mode,
@@ -70,29 +64,30 @@ public static class MinutiaeRenderer
     {
         int width = analysis.Width;
         int height = analysis.Height;
-        var pixels = new byte[width * height * 4];
+        var bgraPixels = new byte[width * height * 4];
 
         for (int y = 0; y < height; y++)
         {
             for (int x = 0; x < width; x++)
             {
-                int i = y * width + x;
+                int pixelIndex = y * width + x;
                 int paddedIndex = (y + 1) * (width + 2) + (x + 1);
-                Color color = PixelColor(analysis, grayscale[i], paddedIndex, mode);
+                Color color = PixelColor(analysis, grayscale[pixelIndex], paddedIndex, mode);
 
-                if (!analysis.Mask[i])
+                if (!analysis.Mask[pixelIndex])
                 {
-                    color = Mix(color, OutsideFingerprint);
+                    color = Mix(color, ScannerBackgroundTint);
                 }
 
-                pixels[i * 4] = color.B;
-                pixels[i * 4 + 1] = color.G;
-                pixels[i * 4 + 2] = color.R;
-                pixels[i * 4 + 3] = 255;
+                int byteIndex = pixelIndex * 4;
+                bgraPixels[byteIndex] = color.B;
+                bgraPixels[byteIndex + 1] = color.G;
+                bgraPixels[byteIndex + 2] = color.R;
+                bgraPixels[byteIndex + 3] = 255;
             }
         }
 
-        return BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixels, width * 4);
+        return BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, bgraPixels, width * 4);
     }
 
     private static Color PixelColor(FingerprintAnalysis analysis, byte brightness, int paddedIndex, ViewMode mode)
@@ -112,8 +107,11 @@ public static class MinutiaeRenderer
     }
 
     // pół na pół: kolor piksela i kolor tła skanera
-    private static Color Mix(Color a, Color b)
+    private static Color Mix(Color pixelColor, Color tint)
     {
-        return Color.FromRgb((byte)((a.R + b.R) / 2), (byte)((a.G + b.G) / 2), (byte)((a.B + b.B) / 2));
+        return Color.FromRgb(
+            (byte)((pixelColor.R + tint.R) / 2),
+            (byte)((pixelColor.G + tint.G) / 2),
+            (byte)((pixelColor.B + tint.B) / 2));
     }
 }

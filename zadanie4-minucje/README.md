@@ -14,7 +14,7 @@ dotnet run --project Minucje.App
 dotnet test Minucje.slnx
 ```
 
-Projects: `Minucje.Core` (`net10.0`) contains the algorithms, `Minucje.App` (`net10.0-windows`) contains the WPF UI and drawing, `Minucje.Tests` contains xUnit tests.
+Projects: `Minucje.Core` (`net10.0`) contains the algorithms, one folder per stage (`Preprocessing`, `Thinning`, `Minutiae`, `Analysis`, `Models`), `Minucje.App` (`net10.0-windows`) contains the WPF UI and drawing, `Minucje.Tests` contains xUnit tests.
 
 ## Using the app
 
@@ -26,8 +26,8 @@ Projects: `Minucje.Core` (`net10.0`) contains the algorithms, `Minucje.App` (`ne
 
 ## Pipeline (`FingerprintAnalyzer.Analyze`)
 
-1. **Mask** (`Preprocessing.ComputeMask`): grey-level standard deviation in 8×8 blocks above 30% of the maximum. Holes are filled by row and by column.
-2. **Binarization** (`Preprocessing.Binarize`): 5×5 blur, then a pixel is a ridge if it is darker than the mean of its 15×15 window.
+1. **Mask** (`FingerprintMask.Compute`): grey-level standard deviation in 8×8 blocks above 30% of the maximum. Holes are filled by row and by column.
+2. **Binarization** (`Binarization.Apply`): 5×5 sliding-window blur, then a pixel is a ridge if it is darker than the mean of its 15×15 window.
 3. **Thinning** (`K3M.Thin`): K3M from task 3.
 4. **Crossing Number** (`CrossingNumber`): `CN = ½ · Σ |P(i) − P(i+1)|` over the 8 neighbours in clockwise order. CN 0 = isolated point, 1 = ending, 2 = ridge pixel, 3 = bifurcation, 4 = crossing. Same-type minutiae within 2 px are merged.
 5. **False minutiae** (`MinutiaeFilter`): a minutia is rejected if the scanner background or the image edge is within *border margin* (16 px). Pairs closer than *min. distance* (8 px) are also rejected: ending + ending (broken ridge), ending + bifurcation (spur), bifurcation + bifurcation (bridge).

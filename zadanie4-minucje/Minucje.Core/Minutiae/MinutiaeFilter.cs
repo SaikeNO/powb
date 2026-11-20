@@ -1,4 +1,6 @@
-namespace Minucje.Core;
+using Minucje.Core.Models;
+
+namespace Minucje.Core.Minutiae;
 
 // Usuwanie fałszywych minucji. Zwraca listę odrzuconych minucji razem z przyczyną.
 //
@@ -14,39 +16,40 @@ namespace Minucje.Core;
 public static class MinutiaeFilter
 {
     public static List<RejectedMinutia> Apply(
-        List<Minutia> minutiae, bool[] mask, int width, int height, int borderMargin, int minDistance)
+        List<Minutia> minutiae, bool[] fingerprintMask, int width, int height, int borderMargin, int minDistance)
     {
         var rejected = new List<RejectedMinutia>();
-        var remaining = new List<Minutia>();
+        var insideFingerprint = new List<Minutia>();
 
         // 1. brzeg skanera
         foreach (Minutia minutia in minutiae)
         {
-            if (IsNearBorder(minutia, mask, width, height, borderMargin))
+            if (IsNearBorder(minutia, fingerprintMask, width, height, borderMargin))
             {
                 rejected.Add(new RejectedMinutia(minutia, RejectionReason.ScannerBorder));
             }
             else
             {
-                remaining.Add(minutia);
+                insideFingerprint.Add(minutia);
             }
         }
 
-        // 2. pary minucji blisko siebie
-        foreach (Minutia a in remaining)
+        // 2. pary minucji blisko siebie (każda minucja odrzucona najwyżej raz)
+        var rejectedInPairs = new HashSet<Minutia>();
+        foreach (Minutia minutia in insideFingerprint)
         {
-            foreach (Minutia b in remaining)
+            foreach (Minutia other in insideFingerprint)
             {
-                if (a == b || Distance(a, b) >= minDistance)
+                if (minutia == other || rejectedInPairs.Contains(minutia) || Distance(minutia, other) >= minDistance)
                 {
                     continue;
                 }
 
-                RejectionReason? reason = GetPairReason(a.Type, b.Type);
-                bool alreadyRejected = rejected.Any(item => item.Minutia == a);
-                if (reason != null && !alreadyRejected)
+                RejectionReason? reason = GetPairReason(minutia.Type, other.Type);
+                if (reason != null)
                 {
-                    rejected.Add(new RejectedMinutia(a, reason.Value));
+                    rejected.Add(new RejectedMinutia(minutia, reason.Value));
+                    rejectedInPairs.Add(minutia);
                 }
             }
         }
@@ -55,14 +58,14 @@ public static class MinutiaeFilter
     }
 
     // czy w kwadracie o promieniu margin wokół minucji jest piksel spoza odcisku albo spoza obrazu
-    public static bool IsNearBorder(Minutia minutia, bool[] mask, int width, int height, int margin)
+    public static bool IsNearBorder(Minutia minutia, bool[] fingerprintMask, int width, int height, int margin)
     {
         for (int y = minutia.Y - margin; y <= minutia.Y + margin; y++)
         {
             for (int x = minutia.X - margin; x <= minutia.X + margin; x++)
             {
                 bool outsideImage = x < 0 || y < 0 || x >= width || y >= height;
-                if (outsideImage || !mask[y * width + x])
+                if (outsideImage || !fingerprintMask[y * width + x])
                 {
                     return true;
                 }
@@ -71,29 +74,32 @@ public static class MinutiaeFilter
         return false;
     }
 
-    private static double Distance(Minutia a, Minutia b)
+    private static double Distance(Minutia first, Minutia second)
     {
-        int dx = a.X - b.X;
-        int dy = a.Y - b.Y;
+        int dx = first.X - second.X;
+        int dy = first.Y - second.Y;
         return Math.Sqrt(dx * dx + dy * dy);
     }
 
-    private static RejectionReason? GetPairReason(MinutiaType a, MinutiaType b)
+    private static RejectionReason? GetPairReason(MinutiaType first, MinutiaType second)
     {
-        if (a == MinutiaType.Ending && b == MinutiaType.Ending)
+        bool bothEndings = first == MinutiaType.Ending && second == MinutiaType.Ending;
+        bool bothBifurcations = first == MinutiaType.Bifurcation && second == MinutiaType.Bifurcation;
+        bool endingAndBifurcation =
+            (first == MinutiaType.Ending && second == MinutiaType.Bifurcation) ||
+            (first == MinutiaType.Bifurcation && second == MinutiaType.Ending);
+
+        if (bothEndings)
         {
             return RejectionReason.BrokenRidge;
         }
-        if (a == MinutiaType.Bifurcation && b == MinutiaType.Bifurcation)
+        if (bothBifurcations)
         {
             return RejectionReason.Bridge;
         }
-        if (a == MinutiaType.Ending || b == MinutiaType.Ending)
+        if (endingAndBifurcation)
         {
-            if (a == MinutiaType.Bifurcation || b == MinutiaType.Bifurcation)
-            {
-                return RejectionReason.Spur;
-            }
+            return RejectionReason.Spur;
         }
         return null; // pary ze skrzyżowaniem lub punktem izolowanym zostawiamy
     }

@@ -55,7 +55,7 @@
             </Setter>
         </Style>
 
-        <!-- wiersz tabeli liczności: checkbox + kolor | nazwa | CN | A | B -->
+        <!-- wiersz tabeli (Models/TableRow): checkbox + ikona | nazwa | CN | A | B -->
         <DataTemplate x:Key="CountRowTemplate">
             <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="0,5"
                     ToolTip="{Binding ToolTip}" Background="Transparent">
@@ -68,16 +68,16 @@
                         <ColumnDefinition Width="38"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Orientation="Horizontal">
-                        <CheckBox x:Name="ShowCheck" Tag="{Binding Key}" IsChecked="{Binding IsVisible, Mode=OneWay}"
+                        <CheckBox x:Name="ShowCheck" Tag="{Binding VisibilityKey}" IsChecked="{Binding IsVisible, Mode=OneWay}"
                                   Checked="Visibility_Changed" Unchecked="Visibility_Changed" VerticalAlignment="Center" Margin="0,0,4,0"
                                   ToolTip="Pokaż na obrazach"/>
                         <Image Source="{Binding Icon}" Width="16" Height="16"/>
                     </StackPanel>
                     <TextBlock x:Name="NameText" Grid.Column="1" Text="{Binding Name}"/>
-                    <TextBlock Grid.Column="2" Text="{Binding Detail}" Foreground="{StaticResource MutedBrush}"
+                    <TextBlock Grid.Column="2" Text="{Binding CrossingNumber}" Foreground="{StaticResource MutedBrush}"
                                HorizontalAlignment="Right"/>
-                    <TextBlock x:Name="AText" Grid.Column="3" Text="{Binding A}" HorizontalAlignment="Right"/>
-                    <TextBlock x:Name="BText" Grid.Column="4" Text="{Binding B}" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="AText" Grid.Column="3" Text="{Binding CountAText}" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="BText" Grid.Column="4" Text="{Binding CountBText}" HorizontalAlignment="Right"/>
                 </Grid>
             </Border>
             <DataTemplate.Triggers>
@@ -177,29 +177,29 @@
                         <TextBlock Grid.Column="4" Text="B" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"
                                    HorizontalAlignment="Right"/>
                     </Grid>
-                    <ItemsControl x:Name="CountsList" ItemTemplate="{StaticResource CountRowTemplate}"/>
+                    <ItemsControl x:Name="MinutiaCountsList" ItemTemplate="{StaticResource CountRowTemplate}"/>
 
                     <Rectangle Height="1" Fill="{StaticResource LineBrush}" Margin="0,18,0,14"/>
 
                     <TextBlock Text="Fałszywe minucje" Style="{StaticResource SectionTitle}"/>
-                    <CheckBox x:Name="RemoveFalseCheck" Content="Usuwaj fałszywe minucje" IsChecked="True"
+                    <CheckBox x:Name="RemoveFalseMinutiaeCheck" Content="Usuwaj fałszywe minucje" IsChecked="True"
                               Click="Options_Changed" Margin="0,0,0,10"/>
 
-                    <StackPanel IsEnabled="{Binding IsChecked, ElementName=RemoveFalseCheck}">
+                    <StackPanel IsEnabled="{Binding IsChecked, ElementName=RemoveFalseMinutiaeCheck}">
                         <DockPanel Margin="0,0,0,2">
-                            <TextBlock x:Name="BorderText" DockPanel.Dock="Right" Text="16 px" Style="{StaticResource Muted}"/>
+                            <TextBlock x:Name="BorderMarginText" DockPanel.Dock="Right" Text="16 px" Style="{StaticResource Muted}"/>
                             <TextBlock Text="Margines brzegu"
                                        ToolTip="Minucje bliżej brzegu odcisku niż ta odległość są odrzucane."/>
                         </DockPanel>
-                        <Slider x:Name="BorderSlider" Minimum="0" Maximum="40" Value="16" IsSnapToTickEnabled="True"
+                        <Slider x:Name="BorderMarginSlider" Minimum="0" Maximum="40" Value="16" IsSnapToTickEnabled="True"
                                 TickFrequency="1" ValueChanged="Slider_Changed" Margin="0,0,0,8"/>
 
                         <DockPanel Margin="0,0,0,2">
-                            <TextBlock x:Name="DistanceText" DockPanel.Dock="Right" Text="8 px" Style="{StaticResource Muted}"/>
+                            <TextBlock x:Name="MinDistanceText" DockPanel.Dock="Right" Text="8 px" Style="{StaticResource Muted}"/>
                             <TextBlock Text="Minimalna odległość"
                                        ToolTip="Dwie minucje bliżej siebie niż ta odległość są uznawane za szum i odrzucane."/>
                         </DockPanel>
-                        <Slider x:Name="DistanceSlider" Minimum="0" Maximum="20" Value="8" IsSnapToTickEnabled="True"
+                        <Slider x:Name="MinDistanceSlider" Minimum="0" Maximum="20" Value="8" IsSnapToTickEnabled="True"
                                 TickFrequency="1" ValueChanged="Slider_Changed" Margin="0,0,0,8"/>
 
                         <Grid Margin="0,4,0,2">
@@ -211,11 +211,11 @@
                             <TextBlock Grid.Column="1" Text="Przyczyna odrzucenia" Style="{StaticResource Muted}"/>
                         </Grid>
 
-                        <ItemsControl x:Name="RejectedList" ItemTemplate="{StaticResource CountRowTemplate}"/>
+                        <ItemsControl x:Name="RejectedCountsList" ItemTemplate="{StaticResource CountRowTemplate}"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                        <Image x:Name="RejectedIcon" Width="16" Height="16" Margin="0,0,6,0"/>
+                        <Image x:Name="RejectedLegendIcon" Width="16" Height="16" Margin="0,0,6,0"/>
                         <TextBlock Text="odrzucona" Style="{StaticResource Muted}" Margin="0,0,16,0"/>
                         <Border Width="14" Height="14" Background="#F0E4BA" Margin="0,0,6,0"/>
                         <TextBlock Text="poza odciskiem" Style="{StaticResource Muted}"/>

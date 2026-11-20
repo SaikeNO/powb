@@ -12,8 +12,8 @@ Cała ekstrakcja jest w jednej metodzie, `FingerprintAnalyzer.Analyze`. Od niej 
 
 ```
 obraz (jasność 0-255)
-  │ 1. Preprocessing.ComputeMask    gdzie jest odcisk, a gdzie tło skanera
-  │ 2. Preprocessing.Binarize       linie papilarne = 1, doliny = 0
+  │ 1. FingerprintMask.Compute      gdzie jest odcisk, a gdzie tło skanera
+  │ 2. Binarization.Apply           linie papilarne = 1, doliny = 0
   │ 3. K3M.Thin                     linie grubości 1 piksela (szkielet)
   │ 4. CrossingNumber.FindMinutiae  CN dla każdego piksela szkieletu → minucje
   │ 5. MinutiaeFilter.Apply         odrzucenie fałszywych minucji
@@ -27,25 +27,30 @@ W aplikacji można przełączyć **Widok** (oryginał / szkielet / binarny) i zo
 
 ### `Minucje.Core` (algorytmy, bez interfejsu)
 
+Każdy folder odpowiada jednemu etapowi, każda klasa i każdy enum ma osobny plik.
+
 | Plik | Co robi |
 |---|---|
-| `FingerprintAnalyzer.cs` | cały proces z kroków 1-5 w kilku linijkach |
-| `Neighbourhood.cs` | jak są zapisane obrazy i jak czytamy 8 sąsiadów piksela |
-| `Preprocessing.cs` | maska odcisku i binaryzacja |
-| `K3M.cs` | szkieletyzacja (ta sama co w zadaniu 3) |
-| `CrossingNumber.cs` | **główny temat zadania**: wzór CN i wyszukiwanie minucji |
-| `MinutiaeFilter.cs` | usuwanie fałszywych minucji (punkty dodatkowe) |
-| `Minutia.cs` | typy minucji i przyczyny odrzucenia |
+| `Analysis/FingerprintAnalyzer.cs` | cały proces z kroków 1-5 w kilku linijkach |
+| `Analysis/FingerprintAnalysis.cs`, `AnalysisOptions.cs` | wynik analizy i ustawienia filtra |
+| `Imaging/Neighbourhood.cs` | jak są zapisane obrazy i jak czytamy 8 sąsiadów piksela |
+| `Preprocessing/FingerprintMask.cs` | maska odcisku (gdzie jest odcisk, a gdzie tło skanera) |
+| `Preprocessing/Binarization.cs`, `BoxBlur.cs` | binaryzacja z progiem lokalnym i rozmycie |
+| `Thinning/K3M.cs` | szkieletyzacja (ta sama co w zadaniu 3) |
+| `Minutiae/CrossingNumber.cs` | **główny temat zadania**: wzór CN i wyszukiwanie minucji |
+| `Minutiae/MinutiaeFilter.cs` | usuwanie fałszywych minucji (punkty dodatkowe) |
+| `Models/` | `Minutia`, `MinutiaType`, `RejectedMinutia`, `RejectionReason` |
 
 ### `Minucje.App` (okno WPF)
 
 | Plik | Co robi |
 |---|---|
 | `MainWindow.xaml` | wygląd okna |
-| `MainWindow.xaml.cs` | obsługa przycisków: wczytaj, przelicz, narysuj, uzupełnij tabelę |
-| `MinutiaeRenderer.cs` | rysuje obraz i znaczniki minucji |
-| `Legend.cs` | kolory i polskie nazwy minucji |
-| `ImageConversion.cs` | obraz → tablica jasności, zapis PNG |
+| `MainWindow.xaml.cs` | obsługa kontrolek: wczytaj, przelicz, narysuj, uzupełnij tabelę |
+| `Rendering/MinutiaeRenderer.cs`, `ViewMode.cs` | rysuje obraz i znaczniki minucji |
+| `Rendering/Legend.cs` | kolory i polskie nazwy minucji |
+| `Imaging/ImageConversion.cs` | obraz → tablica jasności, zapis PNG |
+| `Models/` | `FingerprintPanel` (stan panelu A/B), `TableRow` (wiersz tabeli), `SampleImage` |
 
 ## 1. Jak zapisany jest obraz (`Neighbourhood.cs`)
 
@@ -61,15 +66,15 @@ P6  P5  P4
 
 Kolejność jest ważna, bo Crossing Number idzie po sąsiadach dookoła.
 
-## 2. Maska i binaryzacja (`Preprocessing.cs`)
+## 2. Maska i binaryzacja (`Preprocessing/`)
 
 **Maska odcisku.** Obraz dzielimy na bloki 8×8 i w każdym liczymy odchylenie standardowe jasności. Na odcisku linie (ciemne) i doliny (jasne) się przeplatają, więc odchylenie jest duże. Tło skanera jest jednolite, więc odchylenie jest małe. Blok należy do odcisku, jeśli jego odchylenie przekracza 30% największego. Na koniec wypełniamy dziury: blok jest w masce, jeśli bloki z liniami są z obu stron w wierszu i z obu stron w kolumnie. Na ekranie obszar poza maską jest zabarwiony na żółto.
 
-**Binaryzacja.** Piksel jest linią, jeśli jest **ciemniejszy niż średnia jasność w oknie 15×15 wokół niego**. To próg lokalny. Jeden próg dla całego obrazu by nie zadziałał, bo palec jest dociśnięty nierówno: jedna część odcisku jest ciemniejsza od drugiej. Wcześniej obraz jest lekko rozmyty (5×5), co skleja drobne przerwy w liniach. Obie średnie liczy ta sama funkcja `BoxBlur`, tylko z innym promieniem.
+**Binaryzacja.** Piksel jest linią, jeśli jest **ciemniejszy niż średnia jasność w oknie 15×15 wokół niego**. To próg lokalny. Jeden próg dla całego obrazu by nie zadziałał, bo palec jest dociśnięty nierówno: jedna część odcisku jest ciemniejsza od drugiej. Wcześniej obraz jest lekko rozmyty (5×5), co skleja drobne przerwy w liniach. Obie średnie liczy ta sama funkcja `BoxBlur`, tylko z innym promieniem. Średnia jest liczona oknem przesuwanym: przy przejściu o piksel dodajemy piksel, który wchodzi do okna, i odejmujemy ten, który wychodzi, zamiast sumować całe okno od nowa.
 
 ## 3. Szkieletyzacja (`K3M.cs`)
 
-To ten sam K3M co w zadaniu 3, przeniesiony do jednego pliku. Crossing Number wymaga, żeby linia miała **dokładnie 1 piksel grubości**. Inaczej piksel w środku grubej linii miałby wielu sąsiadów i CN wychodziłby bez sensu.
+To ten sam K3M co w zadaniu 3, przeniesiony do jednego pliku. Żeby było szybko, listy wag są zamienione na tablice 256 wartości `true/false`: sprawdzenie, czy waga jest na liście, to jeden odczyt z tablicy zamiast przeszukiwania listy. Crossing Number wymaga, żeby linia miała **dokładnie 1 piksel grubości**. Inaczej piksel w środku grubej linii miałby wielu sąsiadów i CN wychodziłby bez sensu.
 
 ## 4. Crossing Number (`CrossingNumber.cs`): najważniejsza część
 
@@ -85,9 +90,9 @@ W kodzie to pętla po 8 sąsiadach, w której sumujemy, ile razy wartość zmien
 for (int i = 0; i < 8; i++)
 {
     int next = (i + 1) % 8;          // po P8 wracamy do P1
-    sum += Math.Abs(p[i] - p[next]);
+    transitions += Math.Abs(neighbours[i] - neighbours[next]);
 }
-return sum / 2;
+return transitions / 2;
 ```
 
 **Dlaczego dzielimy przez 2?** Każda linia wychodząca z piksela daje dwie zmiany: 0→1, gdy na nią wchodzimy, i 1→0, gdy z niej schodzimy. Połowa liczby zmian to więc **liczba linii wychodzących z piksela**.

@@ -1,4 +1,7 @@
-namespace Minucje.Core;
+using Minucje.Core.Imaging;
+using Minucje.Core.Models;
+
+namespace Minucje.Core.Minutiae;
 
 // Crossing Number (Rutovitz). Dla piksela szkieletu P idziemy dookoła po sąsiadach P1..P8
 // i liczymy, ile razy wartość zmienia się między 0 a 1:
@@ -12,17 +15,20 @@ namespace Minucje.Core;
 //   CN = 2  zwykły punkt linii   CN = 3  rozwidlenie      CN = 4  skrzyżowanie
 public static class CrossingNumber
 {
-    public static int Compute(byte[] skeleton, int index, int paddedWidth)
-    {
-        int[] p = Neighbourhood.GetClockwise(skeleton, index, paddedWidth);
+    // minucje tego samego typu bliżej niż tyle pikseli to jedna minucja
+    private const int MergeDistance = 2;
 
-        int sum = 0;
+    public static int Compute(byte[] skeleton, int pixelIndex, int paddedWidth)
+    {
+        int[] neighbours = Neighbourhood.GetClockwise(skeleton, pixelIndex, paddedWidth);
+
+        int transitions = 0;
         for (int i = 0; i < 8; i++)
         {
             int next = (i + 1) % 8; // po P8 wracamy do P1
-            sum += Math.Abs(p[i] - p[next]);
+            transitions += Math.Abs(neighbours[i] - neighbours[next]);
         }
-        return sum / 2;
+        return transitions / 2;
     }
 
     // CN -> typ minucji; CN = 2 to zwykły punkt linii, więc nie jest minucją (null)
@@ -47,30 +53,33 @@ public static class CrossingNumber
     public static List<Minutia> FindMinutiae(byte[] skeleton, int paddedWidth, int paddedHeight)
     {
         var minutiae = new List<Minutia>();
-        for (int y = 1; y < paddedHeight - 1; y++)
+        for (int paddedY = 1; paddedY < paddedHeight - 1; paddedY++)
         {
-            for (int x = 1; x < paddedWidth - 1; x++)
+            for (int paddedX = 1; paddedX < paddedWidth - 1; paddedX++)
             {
-                int index = y * paddedWidth + x;
-                if (skeleton[index] == 0)
+                int pixelIndex = paddedY * paddedWidth + paddedX;
+                if (skeleton[pixelIndex] == 0)
                 {
                     continue;
                 }
 
-                int crossingNumber = Compute(skeleton, index, paddedWidth);
+                int crossingNumber = Compute(skeleton, pixelIndex, paddedWidth);
                 MinutiaType? type = Classify(crossingNumber);
                 if (type == null)
                 {
                     continue;
                 }
 
+                // współrzędne w obrazie bez ramki
+                int x = paddedX - 1;
+                int y = paddedY - 1;
+
                 // w miejscu rozwidlenia CN = 3 mogą mieć 2-3 sąsiednie piksele - liczymy je jako jedną minucję
-                bool alreadyFound = minutiae.Any(m =>
-                    m.Type == type && Math.Abs(m.X - (x - 1)) <= 2 && Math.Abs(m.Y - (y - 1)) <= 2);
+                bool alreadyFound = minutiae.Any(found =>
+                    found.Type == type && Math.Abs(found.X - x) <= MergeDistance && Math.Abs(found.Y - y) <= MergeDistance);
                 if (!alreadyFound)
                 {
-                    // x - 1, y - 1: współrzędne w obrazie bez ramki
-                    minutiae.Add(new Minutia(x - 1, y - 1, type.Value, crossingNumber));
+                    minutiae.Add(new Minutia(x, y, type.Value, crossingNumber));
                 }
             }
         }

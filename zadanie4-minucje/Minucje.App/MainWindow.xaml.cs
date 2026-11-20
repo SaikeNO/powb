@@ -5,15 +5,19 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
-using Minucje.Core;
+using Minucje.Core.Analysis;
+using Minucje.Core.Models;
+using Minucje.Imaging;
+using Minucje.Models;
+using Minucje.Rendering;
 
 namespace Minucje;
 
 // Okno: dwa odciski (A i B) obok siebie i tabela z liczbą minucji.
-// Cała analiza obrazu jest w Minucje.Core (FingerprintAnalyzer), tutaj jest tylko obsługa przycisków.
+// Cała analiza obrazu jest w Minucje.Core (FingerprintAnalyzer), tutaj jest tylko obsługa kontrolek.
 public partial class MainWindow : Window
 {
-    private static readonly Sample[] Samples =
+    private static readonly SampleImage[] Samples =
     {
         new("Odcisk 1_1", "fp_1_1.png"),
         new("Odcisk 1_2", "fp_1_2.png"),
@@ -29,11 +33,13 @@ public partial class MainWindow : Window
 
     private readonly FingerprintPanel _panelA;
     private readonly FingerprintPanel _panelB;
-    private bool _isReady;
 
-    // co jest rysowane na obrazie (checkboxy w tabelach); na start wszystko
-    private readonly HashSet<MinutiaType> _visibleTypes = new(Enum.GetValues<MinutiaType>());
-    private readonly HashSet<RejectionReason> _visibleReasons = new(Enum.GetValues<RejectionReason>());
+    // false w trakcie tworzenia okna i podczas zmian robionych z kodu - wtedy zdarzenia kontrolek są ignorowane
+    private bool _respondToControlChanges;
+
+    // co jest rysowane na obrazach (checkboxy w tabelach); na start wszystko
+    private readonly HashSet<MinutiaType> _visibleMinutiaTypes = new(Enum.GetValues<MinutiaType>());
+    private readonly HashSet<RejectionReason> _visibleRejectionReasons = new(Enum.GetValues<RejectionReason>());
 
     public MainWindow()
     {
@@ -43,15 +49,15 @@ public partial class MainWindow : Window
         _panelB = new FingerprintPanel(PanelB, SampleComboB, ImageB, InfoB);
         SampleComboA.ItemsSource = Samples;
         SampleComboB.ItemsSource = Samples;
-        RejectedIcon.Source = Legend.RejectedIcon();
+        RejectedLegendIcon.Source = Legend.RejectedIcon();
 
-        _isReady = true;
+        _respondToControlChanges = true;
         SampleComboA.SelectedIndex = 0; // 1_1 i 1_2 to ten sam palec
         SampleComboB.SelectedIndex = 1;
     }
 
     // przyciski i listy mają Tag="A" albo Tag="B", po nim wiadomo, którego odcisku dotyczą
-    private FingerprintPanel PanelOf(object sender)
+    private FingerprintPanel PanelFromTag(object sender)
     {
         return (string)((FrameworkElement)sender).Tag == "B" ? _panelB : _panelA;
     }
@@ -60,11 +66,11 @@ public partial class MainWindow : Window
 
     private void Sample_Changed(object sender, SelectionChangedEventArgs e)
     {
-        FingerprintPanel panel = PanelOf(sender);
-        if (_isReady && panel.Combo.SelectedItem is Sample sample)
+        FingerprintPanel panel = PanelFromTag(sender);
+        if (_respondToControlChanges && panel.SampleCombo.SelectedItem is SampleImage sample)
         {
             var bitmap = new BitmapImage(new Uri("pack://application:,,,/Assets/" + sample.FileName));
-            Load(panel, bitmap, sample.Name);
+            LoadImage(panel, bitmap, sample.Name);
         }
     }
 
@@ -73,54 +79,59 @@ public partial class MainWindow : Window
         var dialog = new OpenFileDialog { Filter = "Obrazy|*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff" };
         if (dialog.ShowDialog() == true)
         {
-            LoadFile(PanelOf(sender), dialog.FileName);
+            LoadFile(PanelFromTag(sender), dialog.FileName);
         }
     }
 
     private void Panel_DragEnter(object sender, DragEventArgs e)
     {
-        PanelOf(sender).Border.BorderBrush = Brushes.RoyalBlue; // podświetlenie miejsca upuszczenia
+        PanelFromTag(sender).Border.BorderBrush = Brushes.RoyalBlue; // podświetlenie miejsca upuszczenia
     }
 
     private void Panel_DragLeave(object sender, DragEventArgs e)
     {
-        PanelOf(sender).Border.ClearValue(Border.BorderBrushProperty);
+        PanelFromTag(sender).Border.ClearValue(Border.BorderBrushProperty);
     }
 
     private void Panel_Drop(object sender, DragEventArgs e)
     {
-        FingerprintPanel panel = PanelOf(sender);
+        FingerprintPanel panel = PanelFromTag(sender);
         panel.Border.ClearValue(Border.BorderBrushProperty);
-        if (e.Data.GetData(DataFormats.FileDrop) is string[] files)
+        if (e.Data.GetData(DataFormats.FileDrop) is string[] droppedFiles)
         {
-            LoadFile(panel, files[0]);
+            LoadFile(panel, droppedFiles[0]);
         }
     }
 
-    private void LoadFile(FingerprintPanel panel, string path)
+    private void LoadFile(FingerprintPanel panel, string filePath)
     {
+        string fileName = Path.GetFileName(filePath);
         try
         {
-            var bitmap = new BitmapImage(new Uri(path));
+            var bitmap = new BitmapImage(new Uri(filePath));
 
-            // własny plik nie jest żadną z próbek, więc czyścimy wybór na liście
-            _isReady = false;
-            panel.Combo.SelectedIndex = -1;
-            _isReady = true;
+            // własny plik nie jest żadną z próbek, więc czyścimy wybór na liście (bez wywoływania Sample_Changed)
+            _respondToControlChanges = false;
+            panel.SampleCombo.SelectedIndex = -1;
+            _respondToControlChanges = true;
 
-            Load(panel, bitmap, Path.GetFileName(path));
+            LoadImage(panel, bitmap, fileName);
         }
         catch (Exception)
         {
-            StatusText.Text = $"Nie udało się wczytać {Path.GetFileName(path)}. Obsługiwane: PNG, JPG, BMP, TIFF.";
+            StatusText.Text = $"Nie udało się wczytać {fileName}. Obsługiwane: PNG, JPG, BMP, TIFF.";
         }
     }
 
-    private void Load(FingerprintPanel panel, BitmapSource bitmap, string name)
+    private void LoadImage(FingerprintPanel panel, BitmapSource bitmap, string imageName)
     {
-        panel.Name = name;
-        panel.Grayscale = ImageConversion.ToGrayscale(bitmap, out panel.Width, out panel.Height);
+        panel.ImageName = imageName;
+        panel.Grayscale = ImageConversion.ToGrayscale(bitmap, out int width, out int height);
+        panel.Width = width;
+        panel.Height = height;
+
         Analyze(panel);
+        UpdateTables();
     }
 
     // ---------- analiza i wyświetlanie ----------
@@ -128,9 +139,9 @@ public partial class MainWindow : Window
     private AnalysisOptions CurrentOptions()
     {
         return new AnalysisOptions(
-            RemoveFalseMinutiae: RemoveFalseCheck.IsChecked == true,
-            BorderMargin: (int)BorderSlider.Value,
-            MinDistance: (int)DistanceSlider.Value);
+            RemoveFalseMinutiae: RemoveFalseMinutiaeCheck.IsChecked == true,
+            BorderMargin: (int)BorderMarginSlider.Value,
+            MinDistance: (int)MinDistanceSlider.Value);
     }
 
     private ViewMode CurrentViewMode()
@@ -154,41 +165,42 @@ public partial class MainWindow : Window
         }
 
         var stopwatch = Stopwatch.StartNew();
-        panel.Result = FingerprintAnalyzer.Analyze(panel.Grayscale, panel.Width, panel.Height, CurrentOptions());
-        panel.Milliseconds = stopwatch.ElapsedMilliseconds;
+        panel.Analysis = FingerprintAnalyzer.Analyze(panel.Grayscale, panel.Width, panel.Height, CurrentOptions());
+        panel.AnalysisMilliseconds = stopwatch.ElapsedMilliseconds;
 
         Draw(panel);
-        UpdateTables();
     }
 
     private void Draw(FingerprintPanel panel)
     {
-        if (panel.Result == null || panel.Grayscale == null)
+        if (panel.Analysis == null || panel.Grayscale == null)
         {
             return;
         }
 
-        panel.Image.Source = MinutiaeRenderer.Render(
-            panel.Result, panel.Grayscale, CurrentViewMode(), _visibleTypes, _visibleReasons);
-        panel.Info.Text = $"{panel.Result.Minutiae.Count} minucji  ·  {panel.Name}  ·  {panel.Width}×{panel.Height} px";
+        panel.ImageControl.Source = MinutiaeRenderer.Render(
+            panel.Analysis, panel.Grayscale, CurrentViewMode(), _visibleMinutiaTypes, _visibleRejectionReasons);
+        panel.InfoText.Text =
+            $"{panel.Analysis.Minutiae.Count} minucji  ·  {panel.ImageName}  ·  {panel.Width}×{panel.Height} px";
     }
 
     // zmiana filtra -> trzeba policzyć minucje od nowa
     private void Options_Changed(object sender, RoutedEventArgs e)
     {
-        if (_isReady)
+        if (_respondToControlChanges)
         {
             Analyze(_panelA);
             Analyze(_panelB);
+            UpdateTables();
         }
     }
 
     private void Slider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (BorderText != null && DistanceText != null)
+        if (BorderMarginText != null && MinDistanceText != null)
         {
-            BorderText.Text = $"{BorderSlider.Value} px";
-            DistanceText.Text = $"{DistanceSlider.Value} px";
+            BorderMarginText.Text = $"{BorderMarginSlider.Value} px";
+            MinDistanceText.Text = $"{MinDistanceSlider.Value} px";
             Options_Changed(sender, e);
         }
     }
@@ -196,7 +208,7 @@ public partial class MainWindow : Window
     // zmiana widoku -> wystarczy narysować jeszcze raz, bez ponownej analizy
     private void View_Changed(object sender, RoutedEventArgs e)
     {
-        if (_isReady)
+        if (_respondToControlChanges)
         {
             Draw(_panelA);
             Draw(_panelB);
@@ -210,8 +222,8 @@ public partial class MainWindow : Window
         bool show = checkBox.IsChecked == true;
         bool changed = checkBox.Tag switch
         {
-            MinutiaType type => show ? _visibleTypes.Add(type) : _visibleTypes.Remove(type),
-            RejectionReason reason => show ? _visibleReasons.Add(reason) : _visibleReasons.Remove(reason),
+            MinutiaType type => show ? _visibleMinutiaTypes.Add(type) : _visibleMinutiaTypes.Remove(type),
+            RejectionReason reason => show ? _visibleRejectionReasons.Add(reason) : _visibleRejectionReasons.Remove(reason),
             _ => false,
         };
         if (changed)
@@ -224,41 +236,45 @@ public partial class MainWindow : Window
 
     private void UpdateTables()
     {
-        FingerprintAnalysis? a = _panelA.Result;
-        FingerprintAnalysis? b = _panelB.Result;
+        FingerprintAnalysis? analysisA = _panelA.Analysis;
+        FingerprintAnalysis? analysisB = _panelB.Analysis;
 
-        var counts = new List<TableRow>();
+        var minutiaRows = new List<TableRow>();
         foreach (MinutiaType type in Enum.GetValues<MinutiaType>())
         {
-            counts.Add(new TableRow(Legend.MarkerIcon(type), Legend.NameOf(type), Legend.CrossingNumberOf(type),
-                a?.Count(type), b?.Count(type), IsTotal: false, Legend.DescriptionOf(type))
+            minutiaRows.Add(new TableRow(Legend.MarkerIcon(type), Legend.NameOf(type), Legend.CrossingNumberOf(type),
+                analysisA?.Count(type), analysisB?.Count(type), IsTotal: false, Legend.DescriptionOf(type))
             {
-                Key = type,
-                IsVisible = _visibleTypes.Contains(type),
+                VisibilityKey = type,
+                IsVisible = _visibleMinutiaTypes.Contains(type),
             });
         }
-        counts.Add(new TableRow(null, "Razem", "", a?.Minutiae.Count, b?.Minutiae.Count, IsTotal: true, null));
-        CountsList.ItemsSource = counts;
+        minutiaRows.Add(new TableRow(null, "Razem", "",
+            analysisA?.Minutiae.Count, analysisB?.Minutiae.Count, IsTotal: true, null));
+        MinutiaCountsList.ItemsSource = minutiaRows;
 
         // gdy filtr jest wyłączony, liczby odrzuconych nie mają sensu - pokazujemy "—"
-        bool filterOn = RemoveFalseCheck.IsChecked == true;
-        var rejected = new List<TableRow>();
+        bool filterEnabled = RemoveFalseMinutiaeCheck.IsChecked == true;
+        ImageSource rejectedIcon = Legend.RejectedIcon();
+        var rejectedRows = new List<TableRow>();
         foreach (RejectionReason reason in Enum.GetValues<RejectionReason>())
         {
-            rejected.Add(new TableRow(Legend.RejectedIcon(), Legend.NameOf(reason), "",
-                filterOn ? a?.Rejected.Count(r => r.Reason == reason) : null,
-                filterOn ? b?.Rejected.Count(r => r.Reason == reason) : null,
+            rejectedRows.Add(new TableRow(rejectedIcon, Legend.NameOf(reason), "",
+                filterEnabled ? analysisA?.CountRejected(reason) : null,
+                filterEnabled ? analysisB?.CountRejected(reason) : null,
                 IsTotal: false, Legend.DescriptionOf(reason))
             {
-                Key = reason,
-                IsVisible = _visibleReasons.Contains(reason),
+                VisibilityKey = reason,
+                IsVisible = _visibleRejectionReasons.Contains(reason),
             });
         }
-        rejected.Add(new TableRow(null, "Odrzucone razem", "",
-            filterOn ? a?.Rejected.Count : null, filterOn ? b?.Rejected.Count : null, IsTotal: true, null));
-        RejectedList.ItemsSource = rejected;
+        rejectedRows.Add(new TableRow(null, "Odrzucone razem", "",
+            filterEnabled ? analysisA?.Rejected.Count : null,
+            filterEnabled ? analysisB?.Rejected.Count : null,
+            IsTotal: true, null));
+        RejectedCountsList.ItemsSource = rejectedRows;
 
-        StatusText.Text = $"Analiza: A {_panelA.Milliseconds} ms, B {_panelB.Milliseconds} ms. " +
+        StatusText.Text = $"Analiza: A {_panelA.AnalysisMilliseconds} ms, B {_panelB.AnalysisMilliseconds} ms. " +
                           "Przeciągnij obraz na panel A lub B, żeby go podmienić.";
     }
 
@@ -266,8 +282,8 @@ public partial class MainWindow : Window
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        FingerprintPanel panel = PanelOf(sender);
-        if (panel.Image.Source is not BitmapSource image)
+        FingerprintPanel panel = PanelFromTag(sender);
+        if (panel.ImageControl.Source is not BitmapSource markedImage)
         {
             return;
         }
@@ -275,54 +291,12 @@ public partial class MainWindow : Window
         var dialog = new SaveFileDialog
         {
             Filter = "PNG|*.png",
-            FileName = Path.GetFileNameWithoutExtension(panel.Name).Replace(' ', '_') + "_minucje.png",
+            FileName = Path.GetFileNameWithoutExtension(panel.ImageName).Replace(' ', '_') + "_minucje.png",
         };
         if (dialog.ShowDialog() == true)
         {
-            ImageConversion.SavePng(image, dialog.FileName);
+            ImageConversion.SavePng(markedImage, dialog.FileName);
             StatusText.Text = "Zapisano: " + dialog.FileName;
         }
-    }
-
-    private sealed record Sample(string Name, string FileName);
-
-    // wiersz tabeli; null w kolumnie A/B wyświetla się jako "—"
-    public sealed record TableRow(ImageSource? Icon, string Name, string Detail, int? CountA, int? CountB,
-        bool IsTotal, string? ToolTip)
-    {
-        public string A => CountA?.ToString() ?? "—";
-
-        public string B => CountB?.ToString() ?? "—";
-
-        // typ minucji albo przyczyna odrzucenia; tylko takie wiersze mają checkbox "pokaż na obrazie"
-        public object? Key { get; init; }
-
-        public bool IsVisible { get; init; }
-
-        public bool HasCheckBox => Key != null;
-    }
-
-    // stan jednego z dwóch paneli: kontrolki + wczytany obraz + wynik analizy
-    private sealed class FingerprintPanel
-    {
-        public FingerprintPanel(Border border, ComboBox combo, Image image, TextBlock info)
-        {
-            Border = border;
-            Combo = combo;
-            Image = image;
-            Info = info;
-        }
-
-        public Border Border { get; }
-        public ComboBox Combo { get; }
-        public Image Image { get; }
-        public TextBlock Info { get; }
-
-        public string Name = "";
-        public byte[]? Grayscale;
-        public int Width;
-        public int Height;
-        public FingerprintAnalysis? Result;
-        public long Milliseconds;
     }
 }

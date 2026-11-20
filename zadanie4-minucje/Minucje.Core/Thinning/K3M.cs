@@ -1,4 +1,6 @@
-namespace Minucje.Core;
+using Minucje.Core.Imaging;
+
+namespace Minucje.Core.Thinning;
 
 // Szkieletyzacja K3M (Saeed, Tabędzki, Rybnik, Adamski 2010), ta sama co w zadaniu 3.
 // Zamienia linie papilarne grubości kilku pikseli na linie grubości 1 piksela,
@@ -33,12 +35,18 @@ public static class K3M
         },
     };
 
-    // A1pix: końcowe ścienienie do grubości dokładnie 1 piksela (w zadaniu 3 to ta sama lista co A0)
-    private static readonly int[] OnePixelWidthWeights = BorderWeights;
+    // Szybkie sprawdzanie: zamiast szukać wagi na liście (Contains), sprawdzamy tablicę 256 wartości true/false.
+    // isBorder[waga] == true  <=>  waga jest na liście BorderWeights
+    private static readonly bool[] IsBorder = ToLookup(BorderWeights);
+    private static readonly bool[][] CanDeleteInPhase = PhaseWeights.Select(ToLookup).ToArray();
 
-    public static byte[] Thin(byte[] image, int paddedWidth, int paddedHeight)
+    // A1pix: końcowe ścienienie do grubości dokładnie 1 piksela (w zadaniu 3 to ta sama lista co A0)
+    private static readonly bool[] CanDeleteInFinalPass = IsBorder;
+
+    public static byte[] Thin(byte[] binaryImage, int paddedWidth, int paddedHeight)
     {
-        var result = (byte[])image.Clone();
+        var skeleton = (byte[])binaryImage.Clone();
+        var borderPixels = new List<int>();
         bool anyPixelDeleted = true;
 
         while (anyPixelDeleted)
@@ -46,23 +54,27 @@ public static class K3M
             anyPixelDeleted = false;
 
             // faza 0: zapamiętujemy piksele brzegowe
-            var borderPixels = new List<int>();
-            ForEachPixel(paddedWidth, paddedHeight, index =>
+            borderPixels.Clear();
+            for (int y = 1; y < paddedHeight - 1; y++)
             {
-                if (result[index] == 1 && BorderWeights.Contains(Neighbourhood.GetWeight(result, index, paddedWidth)))
+                for (int x = 1; x < paddedWidth - 1; x++)
                 {
-                    borderPixels.Add(index);
+                    int pixelIndex = y * paddedWidth + x;
+                    if (skeleton[pixelIndex] == 1 && IsBorder[Neighbourhood.GetWeight(skeleton, pixelIndex, paddedWidth)])
+                    {
+                        borderPixels.Add(pixelIndex);
+                    }
                 }
-            });
+            }
 
             // fazy 1-5: usuwamy piksele brzegowe, których otoczenie jest na liście danej fazy
-            foreach (int[] phase in PhaseWeights)
+            foreach (bool[] canDelete in CanDeleteInPhase)
             {
-                foreach (int index in borderPixels)
+                foreach (int pixelIndex in borderPixels)
                 {
-                    if (result[index] == 1 && phase.Contains(Neighbourhood.GetWeight(result, index, paddedWidth)))
+                    if (skeleton[pixelIndex] == 1 && canDelete[Neighbourhood.GetWeight(skeleton, pixelIndex, paddedWidth)])
                     {
-                        result[index] = 0;
+                        skeleton[pixelIndex] = 0;
                         anyPixelDeleted = true;
                     }
                 }
@@ -70,26 +82,28 @@ public static class K3M
         }
 
         // faza końcowa: usuwa zbędne piksele, żeby linia miała 1 piksel grubości
-        ForEachPixel(paddedWidth, paddedHeight, index =>
-        {
-            if (result[index] == 1 && OnePixelWidthWeights.Contains(Neighbourhood.GetWeight(result, index, paddedWidth)))
-            {
-                result[index] = 0;
-            }
-        });
-
-        return result;
-    }
-
-    // przechodzi po wszystkich pikselach obrazu (bez ramki)
-    private static void ForEachPixel(int paddedWidth, int paddedHeight, Action<int> action)
-    {
         for (int y = 1; y < paddedHeight - 1; y++)
         {
             for (int x = 1; x < paddedWidth - 1; x++)
             {
-                action(y * paddedWidth + x);
+                int pixelIndex = y * paddedWidth + x;
+                if (skeleton[pixelIndex] == 1 && CanDeleteInFinalPass[Neighbourhood.GetWeight(skeleton, pixelIndex, paddedWidth)])
+                {
+                    skeleton[pixelIndex] = 0;
+                }
             }
         }
+
+        return skeleton;
+    }
+
+    private static bool[] ToLookup(int[] weights)
+    {
+        var lookup = new bool[256];
+        foreach (int weight in weights)
+        {
+            lookup[weight] = true;
+        }
+        return lookup;
     }
 }

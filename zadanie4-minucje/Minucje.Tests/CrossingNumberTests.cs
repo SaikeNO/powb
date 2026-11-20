@@ -1,4 +1,6 @@
-using Minucje.Core;
+using Minucje.Core.Analysis;
+using Minucje.Core.Minutiae;
+using Minucje.Core.Models;
 
 namespace Minucje.Tests;
 
@@ -57,9 +59,9 @@ public class CrossingNumberTests
             ".......");
 
         Assert.Equal(2, minutiae.Count);
-        Assert.All(minutiae, m => Assert.Equal(MinutiaType.Ending, m.Type));
-        Assert.Contains(minutiae, m => m.X == 1 && m.Y == 1);
-        Assert.Contains(minutiae, m => m.X == 5 && m.Y == 1);
+        Assert.All(minutiae, minutia => Assert.Equal(MinutiaType.Ending, minutia.Type));
+        Assert.Contains(minutiae, minutia => minutia.X == 1 && minutia.Y == 1);
+        Assert.Contains(minutiae, minutia => minutia.X == 5 && minutia.Y == 1);
     }
 
     [Fact]
@@ -73,9 +75,9 @@ public class CrossingNumberTests
             "...#...",
             "...#...");
 
-        Minutia bifurcation = Assert.Single(minutiae, m => m.Type == MinutiaType.Bifurcation);
+        Minutia bifurcation = Assert.Single(minutiae, minutia => minutia.Type == MinutiaType.Bifurcation);
         Assert.Equal((3, 3), (bifurcation.X, bifurcation.Y));
-        Assert.Equal(3, minutiae.Count(m => m.Type == MinutiaType.Ending));
+        Assert.Equal(3, minutiae.Count(minutia => minutia.Type == MinutiaType.Ending));
     }
 
     [Fact]
@@ -88,9 +90,9 @@ public class CrossingNumberTests
             ".#.#.",
             "#...#");
 
-        Minutia crossing = Assert.Single(minutiae, m => m.Type == MinutiaType.Crossing);
+        Minutia crossing = Assert.Single(minutiae, minutia => minutia.Type == MinutiaType.Crossing);
         Assert.Equal((2, 2), (crossing.X, crossing.Y));
-        Assert.Equal(4, minutiae.Count(m => m.Type == MinutiaType.Ending));
+        Assert.Equal(4, minutiae.Count(minutia => minutia.Type == MinutiaType.Ending));
     }
 
     [Fact]

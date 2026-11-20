@@ -1,4 +1,6 @@
-using Minucje.Core;
+using Minucje.Core.Analysis;
+using Minucje.Core.Minutiae;
+using Minucje.Core.Models;
 
 namespace Minucje.Tests;
 
@@ -46,12 +48,12 @@ public class FilterAndPipelineTests
     [InlineData(MinutiaType.Bifurcation, MinutiaType.Bifurcation, RejectionReason.Bridge)]
     public void ClosePair_IsRejectedTogether(MinutiaType first, MinutiaType second, RejectionReason expected)
     {
-        var a = new Minutia(50, 50, first, 1);
-        var b = new Minutia(53, 52, second, 3);
+        var firstMinutia = new Minutia(50, 50, first, 1);
+        var secondMinutia = new Minutia(53, 52, second, 3);
         var farAway = new Minutia(80, 80, MinutiaType.Ending, 1);
 
         List<RejectedMinutia> rejected = MinutiaeFilter.Apply(
-            new List<Minutia> { a, b, farAway }, FullMask, Width, Height, borderMargin: 5, minDistance: 6);
+            new List<Minutia> { firstMinutia, secondMinutia, farAway }, FullMask, Width, Height, borderMargin: 5, minDistance: 6);
 
         Assert.Equal(2, rejected.Count);
         Assert.All(rejected, item => Assert.Equal(expected, item.Reason));
