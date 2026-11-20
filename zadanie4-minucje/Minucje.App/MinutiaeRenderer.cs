@@ -20,9 +20,9 @@ public static class MinutiaeRenderer
     private static readonly Color OutsideFingerprint = Color.FromRgb(240, 228, 186);  // tło skanera - żółtawe
     private static readonly Color RidgeOnSkeletonView = Color.FromRgb(209, 213, 219);
 
-    // visibleTypes: typy minucji zaznaczone w tabeli (checkboxy), tylko te są rysowane
-    public static BitmapSource Render(FingerprintAnalysis analysis, byte[] grayscale, ViewMode mode, bool showRejected,
-        ISet<MinutiaType> visibleTypes)
+    // visibleTypes / visibleReasons: co jest zaznaczone checkboxami w tabelach, tylko to jest rysowane
+    public static BitmapSource Render(FingerprintAnalysis analysis, byte[] grayscale, ViewMode mode,
+        ISet<MinutiaType> visibleTypes, ISet<RejectionReason> visibleReasons)
     {
         var visual = new DrawingVisual();
         RenderOptions.SetBitmapScalingMode(visual, BitmapScalingMode.NearestNeighbor);
@@ -33,10 +33,10 @@ public static class MinutiaeRenderer
             var imageRect = new Rect(0, 0, analysis.Width * Scale, analysis.Height * Scale);
             context.DrawImage(DrawBackground(analysis, grayscale, mode), imageRect);
 
-            // 2. odrzucone (fałszywe) minucje jako pomarańczowe ×
-            if (showRejected)
+            // 2. odrzucone (fałszywe) minucje jako szare ×
+            foreach (RejectedMinutia rejected in analysis.Rejected)
             {
-                foreach (RejectedMinutia rejected in analysis.Rejected)
+                if (visibleReasons.Contains(rejected.Reason))
                 {
                     Legend.DrawRejectedMarker(context, CenterOf(rejected.Minutia), 4 * Scale);
                 }

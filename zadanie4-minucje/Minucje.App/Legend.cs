@@ -8,7 +8,7 @@ namespace Minucje;
 // Te same znaczniki rysuje MinutiaeRenderer na obrazie i tabela po prawej jako ikony.
 public static class Legend
 {
-    public static readonly Color RejectedColor = Color.FromRgb(249, 115, 22); // pomarańczowy
+    public static readonly Color RejectedColor = Color.FromRgb(120, 113, 108); // ciepły szary
 
     public static Color ColorOf(MinutiaType type)
     {
@@ -83,11 +83,11 @@ public static class Legend
         context.DrawEllipse(null, pen, center, size / 2, size / 2);
     }
 
-    // odrzucona minucja: pomarańczowy × z białą obwódką, żeby był widoczny na ciemnych liniach
+    // odrzucona minucja: szary × z białą obwódką - widoczny na liniach, ale nie odciąga uwagi od prawdziwych
     public static void DrawRejectedMarker(DrawingContext context, Point center, double size)
     {
-        double thickness = size / 4;
-        DrawCross(context, new Pen(Brushes.White, thickness + 2), center, size / 2);
+        double thickness = size / 5;
+        DrawCross(context, new Pen(Brushes.White, thickness + 1.5), center, size / 2);
         DrawCross(context, new Pen(new SolidColorBrush(RejectedColor), thickness), center, size / 2);
     }
 

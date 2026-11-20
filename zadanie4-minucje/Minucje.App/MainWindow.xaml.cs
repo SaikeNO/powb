@@ -31,8 +31,9 @@ public partial class MainWindow : Window
     private readonly FingerprintPanel _panelB;
     private bool _isReady;
 
-    // typy minucji rysowane na obrazie (checkboxy w tabeli); na start wszystkie
+    // co jest rysowane na obrazie (checkboxy w tabelach); na start wszystko
     private readonly HashSet<MinutiaType> _visibleTypes = new(Enum.GetValues<MinutiaType>());
+    private readonly HashSet<RejectionReason> _visibleReasons = new(Enum.GetValues<RejectionReason>());
 
     public MainWindow()
     {
@@ -168,7 +169,7 @@ public partial class MainWindow : Window
         }
 
         panel.Image.Source = MinutiaeRenderer.Render(
-            panel.Result, panel.Grayscale, CurrentViewMode(), ShowRejectedCheck.IsChecked == true, _visibleTypes);
+            panel.Result, panel.Grayscale, CurrentViewMode(), _visibleTypes, _visibleReasons);
         panel.Info.Text = $"{panel.Result.Minutiae.Count} minucji  ·  {panel.Name}  ·  {panel.Width}×{panel.Height} px";
     }
 
@@ -202,12 +203,17 @@ public partial class MainWindow : Window
         }
     }
 
-    // checkbox przy typie minucji: pokaż / ukryj ten typ na obu obrazach
-    private void TypeVisibility_Changed(object sender, RoutedEventArgs e)
+    // checkbox w tabeli: pokaż / ukryj dany typ minucji albo daną przyczynę odrzucenia na obu obrazach
+    private void Visibility_Changed(object sender, RoutedEventArgs e)
     {
         var checkBox = (CheckBox)sender;
-        var type = (MinutiaType)checkBox.Tag;
-        bool changed = checkBox.IsChecked == true ? _visibleTypes.Add(type) : _visibleTypes.Remove(type);
+        bool show = checkBox.IsChecked == true;
+        bool changed = checkBox.Tag switch
+        {
+            MinutiaType type => show ? _visibleTypes.Add(type) : _visibleTypes.Remove(type),
+            RejectionReason reason => show ? _visibleReasons.Add(reason) : _visibleReasons.Remove(reason),
+            _ => false,
+        };
         if (changed)
         {
             View_Changed(sender, e); // rysujemy od nowa tylko gdy coś się zmieniło
@@ -227,7 +233,7 @@ public partial class MainWindow : Window
             counts.Add(new TableRow(Legend.MarkerIcon(type), Legend.NameOf(type), Legend.CrossingNumberOf(type),
                 a?.Count(type), b?.Count(type), IsTotal: false, Legend.DescriptionOf(type))
             {
-                Type = type,
+                Key = type,
                 IsVisible = _visibleTypes.Contains(type),
             });
         }
@@ -239,10 +245,14 @@ public partial class MainWindow : Window
         var rejected = new List<TableRow>();
         foreach (RejectionReason reason in Enum.GetValues<RejectionReason>())
         {
-            rejected.Add(new TableRow(null, Legend.NameOf(reason), "",
+            rejected.Add(new TableRow(Legend.RejectedIcon(), Legend.NameOf(reason), "",
                 filterOn ? a?.Rejected.Count(r => r.Reason == reason) : null,
                 filterOn ? b?.Rejected.Count(r => r.Reason == reason) : null,
-                IsTotal: false, Legend.DescriptionOf(reason)));
+                IsTotal: false, Legend.DescriptionOf(reason))
+            {
+                Key = reason,
+                IsVisible = _visibleReasons.Contains(reason),
+            });
         }
         rejected.Add(new TableRow(null, "Odrzucone razem", "",
             filterOn ? a?.Rejected.Count : null, filterOn ? b?.Rejected.Count : null, IsTotal: true, null));
@@ -284,12 +294,12 @@ public partial class MainWindow : Window
 
         public string B => CountB?.ToString() ?? "—";
 
-        // tylko wiersze z typem minucji mają checkbox "pokaż na obrazie"
-        public MinutiaType? Type { get; init; }
+        // typ minucji albo przyczyna odrzucenia; tylko takie wiersze mają checkbox "pokaż na obrazie"
+        public object? Key { get; init; }
 
         public bool IsVisible { get; init; }
 
-        public bool HasCheckBox => Type != null;
+        public bool HasCheckBox => Key != null;
     }
 
     // stan jednego z dwóch paneli: kontrolki + wczytany obraz + wynik analizy

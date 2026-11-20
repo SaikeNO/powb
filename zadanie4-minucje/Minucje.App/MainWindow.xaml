@@ -68,9 +68,9 @@
                         <ColumnDefinition Width="38"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Orientation="Horizontal">
-                        <CheckBox x:Name="ShowCheck" Tag="{Binding Type}" IsChecked="{Binding IsVisible, Mode=OneWay}"
-                                  Checked="TypeVisibility_Changed" Unchecked="TypeVisibility_Changed" VerticalAlignment="Center" Margin="0,0,4,0"
-                                  ToolTip="Pokaż ten typ na obrazach"/>
+                        <CheckBox x:Name="ShowCheck" Tag="{Binding Key}" IsChecked="{Binding IsVisible, Mode=OneWay}"
+                                  Checked="Visibility_Changed" Unchecked="Visibility_Changed" VerticalAlignment="Center" Margin="0,0,4,0"
+                                  ToolTip="Pokaż na obrazach"/>
                         <Image Source="{Binding Icon}" Width="16" Height="16"/>
                     </StackPanel>
                     <TextBlock x:Name="NameText" Grid.Column="1" Text="{Binding Name}"/>
@@ -202,8 +202,14 @@
                         <Slider x:Name="DistanceSlider" Minimum="0" Maximum="20" Value="8" IsSnapToTickEnabled="True"
                                 TickFrequency="1" ValueChanged="Slider_Changed" Margin="0,0,0,8"/>
 
-                        <CheckBox x:Name="ShowRejectedCheck" Content="Pokaż odrzucone na obrazie" IsChecked="True"
-                                  Click="View_Changed" Margin="0,0,0,10"/>
+                        <Grid Margin="0,4,0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="44"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Pokaż" Style="{StaticResource Muted}"/>
+                            <TextBlock Grid.Column="1" Text="Przyczyna odrzucenia" Style="{StaticResource Muted}"/>
+                        </Grid>
 
                         <ItemsControl x:Name="RejectedList" ItemTemplate="{StaticResource CountRowTemplate}"/>
                     </StackPanel>
