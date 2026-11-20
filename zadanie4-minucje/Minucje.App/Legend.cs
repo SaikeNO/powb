@@ -8,7 +8,7 @@ namespace Minucje;
 // Te same znaczniki rysuje MinutiaeRenderer na obrazie i tabela po prawej jako ikony.
 public static class Legend
 {
-    public static readonly Color RejectedColor = Color.FromRgb(107, 114, 128);
+    public static readonly Color RejectedColor = Color.FromRgb(249, 115, 22); // pomarańczowy
 
     public static Color ColorOf(MinutiaType type)
     {
@@ -83,10 +83,16 @@ public static class Legend
         context.DrawEllipse(null, pen, center, size / 2, size / 2);
     }
 
+    // odrzucona minucja: pomarańczowy × z białą obwódką, żeby był widoczny na ciemnych liniach
     public static void DrawRejectedMarker(DrawingContext context, Point center, double size)
     {
-        var pen = new Pen(new SolidColorBrush(RejectedColor), size / 5);
-        double r = size / 2;
+        double thickness = size / 4;
+        DrawCross(context, new Pen(Brushes.White, thickness + 2), center, size / 2);
+        DrawCross(context, new Pen(new SolidColorBrush(RejectedColor), thickness), center, size / 2);
+    }
+
+    private static void DrawCross(DrawingContext context, Pen pen, Point center, double r)
+    {
         context.DrawLine(pen, new Point(center.X - r, center.Y - r), new Point(center.X + r, center.Y + r));
         context.DrawLine(pen, new Point(center.X - r, center.Y + r), new Point(center.X + r, center.Y - r));
     }
@@ -98,7 +104,7 @@ public static class Legend
 
     public static ImageSource RejectedIcon()
     {
-        return Icon(context => DrawRejectedMarker(context, new Point(8, 8), 8));
+        return Icon(context => DrawRejectedMarker(context, new Point(8, 8), 10));
     }
 
     // ikona 16×16 do tabeli

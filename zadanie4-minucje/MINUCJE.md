@@ -122,7 +122,7 @@ Przykład dla rozwidlenia (`#` = linia):
 | zakończenie + rozwidlenie | ostroga (krótkie fałszywe odgałęzienie) |
 | rozwidlenie + rozwidlenie | mostek między liniami albo dziura w linii |
 
-Odrzucamy obie minucje z pary. Na obrazie odrzucone są pokazane jako szare ×, a w tabeli po prawej jest ich liczba według przyczyny. Suwaki zmieniają obie odległości na żywo.
+Odrzucamy obie minucje z pary. Na obrazie odrzucone są pokazane jako pomarańczowe ×, a w tabeli po prawej jest ich liczba według przyczyny. Suwaki zmieniają obie odległości na żywo.
 
 ## Wyniki (odciski 1_1 i 1_2, ten sam palec)
 

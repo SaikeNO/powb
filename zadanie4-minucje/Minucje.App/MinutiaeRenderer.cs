@@ -33,12 +33,12 @@ public static class MinutiaeRenderer
             var imageRect = new Rect(0, 0, analysis.Width * Scale, analysis.Height * Scale);
             context.DrawImage(DrawBackground(analysis, grayscale, mode), imageRect);
 
-            // 2. odrzucone (fałszywe) minucje jako szare ×
+            // 2. odrzucone (fałszywe) minucje jako pomarańczowe ×
             if (showRejected)
             {
                 foreach (RejectedMinutia rejected in analysis.Rejected)
                 {
-                    Legend.DrawRejectedMarker(context, CenterOf(rejected.Minutia), 3 * Scale);
+                    Legend.DrawRejectedMarker(context, CenterOf(rejected.Minutia), 4 * Scale);
                 }
             }
 
