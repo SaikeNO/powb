@@ -2,6 +2,7 @@ using Minucje.Core.Models;
 
 namespace Minucje.Core.Minutiae;
 
+// usuwanie fałszywych minucji (punkty dodatkowe)
 public static class MinutiaeFilter
 {
     public static List<RejectedMinutia> Apply(
@@ -10,6 +11,7 @@ public static class MinutiaeFilter
         var rejected = new List<RejectedMinutia>();
         var insideFingerprint = new List<Minutia>();
 
+        // 1. brzeg skanera: linie ucięte na krawędzi odcisku dają fałszywe zakończenia
         foreach (Minutia minutia in minutiae)
         {
             if (IsNearBorder(minutia, fingerprintMask, width, height, borderMargin))
@@ -22,6 +24,7 @@ public static class MinutiaeFilter
             }
         }
 
+        // 2. dwie minucje bliżej niż minDistance (mniej niż odstęp linii) to szum - odrzucamy obie
         var rejectedInPairs = new HashSet<Minutia>();
         foreach (Minutia minutia in insideFingerprint)
         {
@@ -44,6 +47,7 @@ public static class MinutiaeFilter
         return rejected;
     }
 
+    // czy w kwadracie +-margin wokół minucji jest tło skanera albo krawędź obrazu
     public static bool IsNearBorder(Minutia minutia, bool[] fingerprintMask, int width, int height, int margin)
     {
         for (int y = minutia.Y - margin; y <= minutia.Y + margin; y++)
@@ -67,6 +71,7 @@ public static class MinutiaeFilter
         return Math.Sqrt(dx * dx + dy * dy);
     }
 
+    // zakończenie+zakończenie = przerwana linia, rozwidlenie+rozwidlenie = mostek, zakończenie+rozwidlenie = ostroga
     private static RejectionReason? GetPairReason(MinutiaType first, MinutiaType second)
     {
         bool bothEndings = first == MinutiaType.Ending && second == MinutiaType.Ending;

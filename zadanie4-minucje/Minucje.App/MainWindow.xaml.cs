@@ -13,6 +13,8 @@ using Minucje.Rendering;
 
 namespace Minucje;
 
+// okno: dwa odciski A i B obok siebie + tabela z liczbą minucji
+// cała analiza jest w Minucje.Core, tu tylko obsługa kontrolek
 public partial class MainWindow : Window
 {
     private static readonly SampleImage[] Samples =
@@ -32,8 +34,9 @@ public partial class MainWindow : Window
     private readonly FingerprintPanel _panelA;
     private readonly FingerprintPanel _panelB;
 
-    private bool _respondToControlChanges;
+    private bool _respondToControlChanges;   // false = ignorujemy zdarzenia kontrolek (np. przy starcie)
 
+    // co rysujemy na obrazach - sterowane checkboxami w tabelach
     private readonly HashSet<MinutiaType> _visibleMinutiaTypes = new(Enum.GetValues<MinutiaType>());
     private readonly HashSet<RejectionReason> _visibleRejectionReasons = new(Enum.GetValues<RejectionReason>());
 
@@ -115,6 +118,7 @@ public partial class MainWindow : Window
         }
     }
 
+    // obraz -> tablica jasności -> analiza -> rysowanie -> tabela
     private void LoadImage(FingerprintPanel panel, BitmapSource bitmap, string imageName)
     {
         panel.ImageName = imageName;
@@ -147,6 +151,7 @@ public partial class MainWindow : Window
         return ViewMode.Original;
     }
 
+    // uruchamia cały algorytm z FingerprintAnalyzer dla jednego panelu
     private void Analyze(FingerprintPanel panel)
     {
         if (panel.Grayscale == null)
@@ -174,6 +179,7 @@ public partial class MainWindow : Window
             $"{panel.Analysis.Minutiae.Count} minucji  ·  {panel.ImageName}  ·  {panel.Width}×{panel.Height} px";
     }
 
+    // zmiana filtra -> trzeba policzyć minucje od nowa
     private void Options_Changed(object sender, RoutedEventArgs e)
     {
         if (_respondToControlChanges)
@@ -194,6 +200,7 @@ public partial class MainWindow : Window
         }
     }
 
+    // zmiana widoku lub checkboxa -> wystarczy narysować od nowa, bez analizy
     private void View_Changed(object sender, RoutedEventArgs e)
     {
         if (_respondToControlChanges)
@@ -219,6 +226,7 @@ public partial class MainWindow : Window
         }
     }
 
+    // liczba minucji każdego typu dla A i B oraz liczba odrzuconych według przyczyny
     private void UpdateTables()
     {
         FingerprintAnalysis? analysisA = _panelA.Analysis;

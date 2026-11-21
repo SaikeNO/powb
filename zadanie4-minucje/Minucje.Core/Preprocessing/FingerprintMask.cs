@@ -1,5 +1,6 @@
 namespace Minucje.Core.Preprocessing;
 
+// maska odcisku: true = odcisk, false = tło skanera
 public static class FingerprintMask
 {
     private const int BlockSize = 8;
@@ -10,6 +11,7 @@ public static class FingerprintMask
         int blockColumns = (width + BlockSize - 1) / BlockSize;
         int blockRows = (height + BlockSize - 1) / BlockSize;
 
+        // odchylenie standardowe jasności w blokach 8x8: na odcisku duże (linie i doliny), na tle małe
         var blockStdDev = new double[blockColumns, blockRows];
         for (int column = 0; column < blockColumns; column++)
         {
@@ -19,6 +21,7 @@ public static class FingerprintMask
             }
         }
 
+        // blok ma linie, jeśli jego odchylenie > 30% największego
         double maxStdDev = blockStdDev.Cast<double>().Max();
         var blockHasRidges = new bool[blockColumns, blockRows];
         for (int column = 0; column < blockColumns; column++)
@@ -29,6 +32,7 @@ public static class FingerprintMask
             }
         }
 
+        // wypełnianie dziur: blok należy do odcisku, jeśli ma bloki z liniami z obu stron w poziomie i w pionie
         var blockInMask = new bool[blockColumns, blockRows];
         for (int column = 0; column < blockColumns; column++)
         {
@@ -42,6 +46,7 @@ public static class FingerprintMask
             }
         }
 
+        // maska bloków -> maska pikseli
         var mask = new bool[width * height];
         for (int y = 0; y < height; y++)
         {

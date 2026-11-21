@@ -6,9 +6,10 @@ using Minucje.Core.Models;
 
 namespace Minucje.Rendering;
 
+// rysuje odcisk (oryginał / szkielet / binarny) i kolorowe znaczniki minucji
 public static class MinutiaeRenderer
 {
-    private const int Scale = 3;
+    private const int Scale = 3;   // obraz powiększony 3x, żeby znaczniki były czytelne
     private static readonly Color ScannerBackgroundTint = Color.FromRgb(240, 228, 186);
 
     public static BitmapSource Render(FingerprintAnalysis analysis, byte[] grayscale, ViewMode mode,

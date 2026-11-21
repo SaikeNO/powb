@@ -1,5 +1,6 @@
 namespace Minucje.Core.Preprocessing;
 
+// średnia jasność w kwadracie wokół każdego piksela; liczona osobno w poziomie i w pionie
 public static class BoxBlur
 {
     public static byte[] Apply(byte[] image, int width, int height, int radius)
@@ -18,6 +19,7 @@ public static class BoxBlur
         return blurred;
     }
 
+    // okno przesuwane: dodajemy piksel, który wchodzi do okna, odejmujemy ten, który wychodzi
     private static void BlurLine(byte[] source, byte[] target, int start, int step, int length, int radius)
     {
         int windowSum = 0;
