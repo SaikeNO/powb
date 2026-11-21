@@ -5,8 +5,6 @@ using Minucje.Core.Thinning;
 
 namespace Minucje.Core.Analysis;
 
-// Cała ekstrakcja cech w jednym miejscu:
-// maska -> binaryzacja -> szkielet (K3M) -> Crossing Number -> usunięcie fałszywych minucji
 public static class FingerprintAnalyzer
 {
     public static FingerprintAnalysis Analyze(byte[] grayscale, int width, int height, AnalysisOptions options)

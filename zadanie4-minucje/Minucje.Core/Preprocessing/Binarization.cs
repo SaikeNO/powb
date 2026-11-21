@@ -1,13 +1,9 @@
 namespace Minucje.Core.Preprocessing;
 
-// Binaryzacja z progiem lokalnym: piksel jest linią, jeśli jest ciemniejszy niż średnia jasność wokół niego.
-// Jeden próg dla całego obrazu (np. Otsu) nie działa, bo palec jest dociśnięty nierówno: część odcisku jest
-// ciemna, część jasna. Rozmycie 5×5 wcześniej skleja drobne przerwy w liniach (pory skóry, suchy palec).
-// Wynik: obraz 0/1 z ramką 1 piksela (patrz Neighbourhood), poza maską same zera.
 public static class Binarization
 {
-    private const int SmoothingRadius = 2;   // rozmycie 5×5
-    private const int LocalMeanRadius = 7;   // średnia z okna 15×15
+    private const int SmoothingRadius = 2;
+    private const int LocalMeanRadius = 7;
 
     public static byte[] Apply(byte[] grayscale, int width, int height, bool[] fingerprintMask)
     {

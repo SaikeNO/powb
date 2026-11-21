@@ -6,14 +6,11 @@ using Minucje.Core.Models;
 
 namespace Minucje.Rendering;
 
-// Rysuje odcisk z zaznaczonymi minucjami.
-// Obraz jest powiększany 3 razy, żeby znaczniki były czytelne na małych odciskach (ok. 250×340 px).
 public static class MinutiaeRenderer
 {
     private const int Scale = 3;
-    private static readonly Color ScannerBackgroundTint = Color.FromRgb(240, 228, 186);  // tło skanera - żółtawe
+    private static readonly Color ScannerBackgroundTint = Color.FromRgb(240, 228, 186);
 
-    // visibleTypes / visibleReasons: co jest zaznaczone checkboxami w tabelach, tylko to jest rysowane
     public static BitmapSource Render(FingerprintAnalysis analysis, byte[] grayscale, ViewMode mode,
         ISet<MinutiaType> visibleTypes, ISet<RejectionReason> visibleReasons)
     {
@@ -22,11 +19,9 @@ public static class MinutiaeRenderer
 
         using (DrawingContext context = visual.RenderOpen())
         {
-            // 1. tło: oryginał, szkielet albo obraz binarny
             var imageRect = new Rect(0, 0, analysis.Width * Scale, analysis.Height * Scale);
             context.DrawImage(DrawBackground(analysis, grayscale, mode), imageRect);
 
-            // 2. odrzucone (fałszywe) minucje jako szare ×
             foreach (RejectedMinutia rejected in analysis.Rejected)
             {
                 if (visibleReasons.Contains(rejected.Reason))
@@ -35,7 +30,6 @@ public static class MinutiaeRenderer
                 }
             }
 
-            // 3. minucje: piksel minucji wypełniony kolorem + kolorowy okrąg wokół
             foreach (Minutia minutia in analysis.Minutiae)
             {
                 if (!visibleTypes.Contains(minutia.Type))
@@ -59,7 +53,6 @@ public static class MinutiaeRenderer
         return new Point((minutia.X + 0.5) * Scale, (minutia.Y + 0.5) * Scale);
     }
 
-    // obraz w oryginalnym rozmiarze, piksel po pikselu (format BGRA: 4 bajty na piksel)
     private static BitmapSource DrawBackground(FingerprintAnalysis analysis, byte[] grayscale, ViewMode mode)
     {
         int width = analysis.Width;
@@ -106,7 +99,6 @@ public static class MinutiaeRenderer
         }
     }
 
-    // pół na pół: kolor piksela i kolor tła skanera
     private static Color Mix(Color pixelColor, Color tint)
     {
         return Color.FromRgb(

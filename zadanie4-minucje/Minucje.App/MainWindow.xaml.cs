@@ -13,8 +13,6 @@ using Minucje.Rendering;
 
 namespace Minucje;
 
-// Okno: dwa odciski (A i B) obok siebie i tabela z liczbą minucji.
-// Cała analiza obrazu jest w Minucje.Core (FingerprintAnalyzer), tutaj jest tylko obsługa kontrolek.
 public partial class MainWindow : Window
 {
     private static readonly SampleImage[] Samples =
@@ -34,10 +32,8 @@ public partial class MainWindow : Window
     private readonly FingerprintPanel _panelA;
     private readonly FingerprintPanel _panelB;
 
-    // false w trakcie tworzenia okna i podczas zmian robionych z kodu - wtedy zdarzenia kontrolek są ignorowane
     private bool _respondToControlChanges;
 
-    // co jest rysowane na obrazach (checkboxy w tabelach); na start wszystko
     private readonly HashSet<MinutiaType> _visibleMinutiaTypes = new(Enum.GetValues<MinutiaType>());
     private readonly HashSet<RejectionReason> _visibleRejectionReasons = new(Enum.GetValues<RejectionReason>());
 
@@ -52,17 +48,14 @@ public partial class MainWindow : Window
         RejectedLegendIcon.Source = Legend.RejectedIcon();
 
         _respondToControlChanges = true;
-        SampleComboA.SelectedIndex = 0; // 1_1 i 1_2 to ten sam palec
+        SampleComboA.SelectedIndex = 0;
         SampleComboB.SelectedIndex = 1;
     }
 
-    // przyciski i listy mają Tag="A" albo Tag="B", po nim wiadomo, którego odcisku dotyczą
     private FingerprintPanel PanelFromTag(object sender)
     {
         return (string)((FrameworkElement)sender).Tag == "B" ? _panelB : _panelA;
     }
-
-    // ---------- wczytywanie obrazu ----------
 
     private void Sample_Changed(object sender, SelectionChangedEventArgs e)
     {
@@ -85,7 +78,7 @@ public partial class MainWindow : Window
 
     private void Panel_DragEnter(object sender, DragEventArgs e)
     {
-        PanelFromTag(sender).Border.BorderBrush = Brushes.RoyalBlue; // podświetlenie miejsca upuszczenia
+        PanelFromTag(sender).Border.BorderBrush = Brushes.RoyalBlue;
     }
 
     private void Panel_DragLeave(object sender, DragEventArgs e)
@@ -110,7 +103,6 @@ public partial class MainWindow : Window
         {
             var bitmap = new BitmapImage(new Uri(filePath));
 
-            // własny plik nie jest żadną z próbek, więc czyścimy wybór na liście (bez wywoływania Sample_Changed)
             _respondToControlChanges = false;
             panel.SampleCombo.SelectedIndex = -1;
             _respondToControlChanges = true;
@@ -133,8 +125,6 @@ public partial class MainWindow : Window
         Analyze(panel);
         UpdateTables();
     }
-
-    // ---------- analiza i wyświetlanie ----------
 
     private AnalysisOptions CurrentOptions()
     {
@@ -184,7 +174,6 @@ public partial class MainWindow : Window
             $"{panel.Analysis.Minutiae.Count} minucji  ·  {panel.ImageName}  ·  {panel.Width}×{panel.Height} px";
     }
 
-    // zmiana filtra -> trzeba policzyć minucje od nowa
     private void Options_Changed(object sender, RoutedEventArgs e)
     {
         if (_respondToControlChanges)
@@ -205,7 +194,6 @@ public partial class MainWindow : Window
         }
     }
 
-    // zmiana widoku -> wystarczy narysować jeszcze raz, bez ponownej analizy
     private void View_Changed(object sender, RoutedEventArgs e)
     {
         if (_respondToControlChanges)
@@ -215,7 +203,6 @@ public partial class MainWindow : Window
         }
     }
 
-    // checkbox w tabeli: pokaż / ukryj dany typ minucji albo daną przyczynę odrzucenia na obu obrazach
     private void Visibility_Changed(object sender, RoutedEventArgs e)
     {
         var checkBox = (CheckBox)sender;
@@ -228,11 +215,9 @@ public partial class MainWindow : Window
         };
         if (changed)
         {
-            View_Changed(sender, e); // rysujemy od nowa tylko gdy coś się zmieniło
+            View_Changed(sender, e);
         }
     }
-
-    // ---------- tabele po prawej ----------
 
     private void UpdateTables()
     {
@@ -253,7 +238,6 @@ public partial class MainWindow : Window
             analysisA?.Minutiae.Count, analysisB?.Minutiae.Count, IsTotal: true, null));
         MinutiaCountsList.ItemsSource = minutiaRows;
 
-        // gdy filtr jest wyłączony, liczby odrzuconych nie mają sensu - pokazujemy "—"
         bool filterEnabled = RemoveFalseMinutiaeCheck.IsChecked == true;
         ImageSource rejectedIcon = Legend.RejectedIcon();
         var rejectedRows = new List<TableRow>();
@@ -277,8 +261,6 @@ public partial class MainWindow : Window
         StatusText.Text = $"Analiza: A {_panelA.AnalysisMilliseconds} ms, B {_panelB.AnalysisMilliseconds} ms. " +
                           "Przeciągnij obraz na panel A lub B, żeby go podmienić.";
     }
-
-    // ---------- zapis ----------
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {

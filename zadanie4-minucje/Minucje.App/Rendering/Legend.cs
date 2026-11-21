@@ -4,20 +4,18 @@ using Minucje.Core.Models;
 
 namespace Minucje.Rendering;
 
-// Wygląd i nazwy minucji: kolor znacznika, polska nazwa i opis do podpowiedzi.
-// Te same znaczniki rysuje MinutiaeRenderer na obrazie i tabela po prawej jako ikony.
 public static class Legend
 {
-    public static readonly Color RejectedColor = Color.FromRgb(71, 85, 105); // ciemny szaroniebieski
+    public static readonly Color RejectedColor = Color.FromRgb(71, 85, 105);
 
     public static Color ColorOf(MinutiaType type)
     {
         switch (type)
         {
-            case MinutiaType.Ending: return Color.FromRgb(220, 38, 38);       // czerwony
-            case MinutiaType.Bifurcation: return Color.FromRgb(37, 99, 235);  // niebieski
-            case MinutiaType.Crossing: return Color.FromRgb(192, 38, 211);    // fioletowy
-            default: return Color.FromRgb(22, 163, 74);                       // zielony
+            case MinutiaType.Ending: return Color.FromRgb(220, 38, 38);
+            case MinutiaType.Bifurcation: return Color.FromRgb(37, 99, 235);
+            case MinutiaType.Crossing: return Color.FromRgb(192, 38, 211);
+            default: return Color.FromRgb(22, 163, 74);
         }
     }
 
@@ -76,14 +74,12 @@ public static class Legend
         }
     }
 
-    // znacznik: kolorowy okrąg, kolor zależy od typu minucji
     public static void DrawMarker(DrawingContext context, MinutiaType type, Point center, double size)
     {
         var pen = new Pen(new SolidColorBrush(ColorOf(type)), size / 4);
         context.DrawEllipse(null, pen, center, size / 2, size / 2);
     }
 
-    // odrzucona minucja: szary × z białą obwódką - widoczny na liniach, ale nie odciąga uwagi od prawdziwych
     public static void DrawRejectedMarker(DrawingContext context, Point center, double size)
     {
         double thickness = size / 4;
@@ -107,7 +103,6 @@ public static class Legend
         return Icon(context => DrawRejectedMarker(context, new Point(8, 8), 10));
     }
 
-    // ikona 16×16 do tabeli
     private static ImageSource Icon(Action<DrawingContext> draw)
     {
         var drawing = new DrawingGroup();

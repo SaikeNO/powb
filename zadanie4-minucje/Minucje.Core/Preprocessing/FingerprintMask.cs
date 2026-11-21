@@ -1,10 +1,5 @@
 namespace Minucje.Core.Preprocessing;
 
-// Maska odcisku: gdzie na obrazie jest odcisk (true), a gdzie puste tło skanera (false).
-//
-// Dzielimy obraz na bloki 8×8 i liczymy w każdym odchylenie standardowe jasności.
-// Na odcisku linie i doliny się przeplatają, więc jasność mocno się zmienia, a tło skanera jest jednolite.
-// Blok ma linie, jeśli jego odchylenie jest większe niż 30% największego w obrazie.
 public static class FingerprintMask
 {
     private const int BlockSize = 8;
@@ -34,9 +29,6 @@ public static class FingerprintMask
             }
         }
 
-        // Odcisk nie ma dziur: blok należy do maski, jeśli bloki z liniami są i po jego lewej i prawej stronie
-        // (w tym samym wierszu), i nad nim i pod nim (w tej samej kolumnie). Wypełnia to bloki o słabym kontraście
-        // w środku odcisku, a pomija pojedyncze zabrudzenia w tle.
         var blockInMask = new bool[blockColumns, blockRows];
         for (int column = 0; column < blockColumns; column++)
         {
@@ -50,7 +42,6 @@ public static class FingerprintMask
             }
         }
 
-        // maska bloków -> maska pikseli
         var mask = new bool[width * height];
         for (int y = 0; y < height; y++)
         {

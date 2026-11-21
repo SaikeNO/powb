@@ -1,7 +1,5 @@
 namespace Minucje.Core.Preprocessing;
 
-// Średnia jasność w kwadracie (2·radius+1)×(2·radius+1) wokół każdego piksela.
-// Liczona osobno w poziomie (każdy wiersz) i w pionie (każda kolumna) - wynik jest ten sam, a liczenie szybsze.
 public static class BoxBlur
 {
     public static byte[] Apply(byte[] image, int width, int height, int radius)
@@ -20,9 +18,6 @@ public static class BoxBlur
         return blurred;
     }
 
-    // Rozmycie jednej linii (wiersza albo kolumny) metodą przesuwanego okna:
-    // zamiast za każdym razem sumować całe okno, dodajemy piksel, który do okna wchodzi,
-    // i odejmujemy piksel, który z niego wychodzi. Przy krawędzi okno jest krótsze.
     private static void BlurLine(byte[] source, byte[] target, int start, int step, int length, int radius)
     {
         int windowSum = 0;
@@ -38,8 +33,8 @@ public static class BoxBlur
             int windowSize = windowEnd - windowStart + 1;
             target[start + i * step] = (byte)(windowSum / windowSize);
 
-            int entering = i + radius + 1;  // piksel, który wejdzie do okna w następnym kroku
-            int leaving = i - radius;       // piksel, który wyjdzie z okna w następnym kroku
+            int entering = i + radius + 1;
+            int leaving = i - radius;
             if (entering < length)
             {
                 windowSum += source[start + entering * step];

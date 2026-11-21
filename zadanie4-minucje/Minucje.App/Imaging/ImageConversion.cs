@@ -4,7 +4,6 @@ using System.Windows.Media.Imaging;
 
 namespace Minucje.Imaging;
 
-// zamiana obrazu WPF na tablicę jasności 0-255 i zapis PNG
 public static class ImageConversion
 {
     public static byte[] ToGrayscale(BitmapSource source, out int width, out int height)

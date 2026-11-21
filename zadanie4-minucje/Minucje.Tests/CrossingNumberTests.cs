@@ -6,7 +6,6 @@ namespace Minucje.Tests;
 
 public class CrossingNumberTests
 {
-    // obraz z napisów ('#' = linia) -> tablica 0/1 z ramką 1 piksela
     public static (byte[] Pixels, int PaddedWidth, int PaddedHeight) FromAscii(params string[] rows)
     {
         int paddedWidth = rows[0].Length + 2;
@@ -28,7 +27,7 @@ public class CrossingNumberTests
     private static int CrossingNumberOfCentre(params string[] rows)
     {
         (byte[] pixels, int paddedWidth, _) = FromAscii(rows);
-        int centre = 2 * paddedWidth + 2; // piksel (1, 1) obrazu 3×3
+        int centre = 2 * paddedWidth + 2;
         return CrossingNumber.Compute(pixels, centre, paddedWidth);
     }
 
@@ -39,12 +38,12 @@ public class CrossingNumberTests
     }
 
     [Theory]
-    [InlineData(new[] { "...", ".#.", "..." }, 0)] // brak sąsiadów
-    [InlineData(new[] { ".#.", ".#.", "..." }, 1)] // jeden sąsiad
-    [InlineData(new[] { ".##", ".#.", "..." }, 1)] // dwaj sąsiedzi obok siebie to nadal jedna linia
-    [InlineData(new[] { ".#.", ".#.", ".#." }, 2)] // linia przechodzi przez piksel
-    [InlineData(new[] { "...", "###", ".#." }, 3)] // trzy gałęzie
-    [InlineData(new[] { ".#.", "###", ".#." }, 4)] // cztery gałęzie
+    [InlineData(new[] { "...", ".#.", "..." }, 0)]
+    [InlineData(new[] { ".#.", ".#.", "..." }, 1)]
+    [InlineData(new[] { ".##", ".#.", "..." }, 1)]
+    [InlineData(new[] { ".#.", ".#.", ".#." }, 2)]
+    [InlineData(new[] { "...", "###", ".#." }, 3)]
+    [InlineData(new[] { ".#.", "###", ".#." }, 4)]
     public void Compute_CountsLinesLeavingPixel(string[] rows, int expected)
     {
         Assert.Equal(expected, CrossingNumberOfCentre(rows));

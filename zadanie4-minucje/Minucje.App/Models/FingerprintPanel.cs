@@ -3,7 +3,6 @@ using Minucje.Core.Analysis;
 
 namespace Minucje.Models;
 
-// stan jednego z dwóch paneli (A albo B): jego kontrolki, wczytany obraz i wynik analizy
 public sealed class FingerprintPanel
 {
     public FingerprintPanel(Border border, ComboBox sampleCombo, Image imageControl, TextBlock infoText)
@@ -24,7 +23,7 @@ public sealed class FingerprintPanel
 
     public string ImageName { get; set; } = "";
 
-    public byte[]? Grayscale { get; set; }     // jasność 0-255, Width × Height
+    public byte[]? Grayscale { get; set; }
 
     public int Width { get; set; }
 

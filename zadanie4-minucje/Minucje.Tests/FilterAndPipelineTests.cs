@@ -9,7 +9,6 @@ public class FilterAndPipelineTests
     private const int Width = 100;
     private const int Height = 100;
 
-    // cały obraz to odcisk, więc "brzegiem" jest tylko krawędź obrazu
     private static readonly bool[] FullMask = Enumerable.Repeat(true, Width * Height).ToArray();
 
     [Fact]
@@ -34,7 +33,7 @@ public class FilterAndPipelineTests
         {
             for (int x = 60; x < Width; x++)
             {
-                mask[y * Width + x] = false; // prawa część obrazu to tło skanera
+                mask[y * Width + x] = false;
             }
         }
 
@@ -63,7 +62,6 @@ public class FilterAndPipelineTests
     [Fact]
     public void Analyze_SyntheticRidges_KeepsOnlyRealMinutiae()
     {
-        // ciemne poziome linie na jasnym tle; jedna linia ma przerwę, a dwie są połączone mostkiem
         const int width = 160;
         const int height = 160;
         var grayscale = new byte[width * height];
@@ -83,10 +81,8 @@ public class FilterAndPipelineTests
         FingerprintAnalysis withFilter = FingerprintAnalyzer.Analyze(
             grayscale, width, height, new AnalysisOptions(BorderMargin: 12, MinDistance: 6));
 
-        // bez filtra: każda linia urwana na krawędzi obrazu daje zakończenie
         Assert.True(withoutFilter.Count(MinutiaType.Ending) > 20);
 
-        // z filtrem: 2 zakończenia przy przerwie i 2 rozwidlenia przy mostku
         Assert.Equal(2, withFilter.Count(MinutiaType.Ending));
         Assert.Equal(2, withFilter.Count(MinutiaType.Bifurcation));
         Assert.Contains(withFilter.Rejected, item => item.Reason == RejectionReason.ScannerBorder);

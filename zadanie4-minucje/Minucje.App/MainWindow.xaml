@@ -28,7 +28,6 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
 
-        <!-- przełącznik widoku: trzy przyciski obok siebie, zaznaczony podświetlony -->
         <Style x:Key="Segment" TargetType="RadioButton">
             <Setter Property="GroupName" Value="View"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -55,7 +54,6 @@
             </Setter>
         </Style>
 
-        <!-- wiersz tabeli (Models/TableRow): checkbox + ikona | nazwa | CN | A | B -->
         <DataTemplate x:Key="CountRowTemplate">
             <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="0,5"
                     ToolTip="{Binding ToolTip}" Background="Transparent">
@@ -107,7 +105,6 @@
             <ColumnDefinition Width="300"/>
         </Grid.ColumnDefinitions>
 
-        <!-- pasek widoku -->
         <StackPanel Grid.Row="0" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,0,0,10">
             <TextBlock Text="Widok" Style="{StaticResource Muted}" Margin="0,0,8,0"/>
             <RadioButton x:Name="ViewOriginal" Content="Oryginał" Style="{StaticResource Segment}"
@@ -118,7 +115,6 @@
                          Checked="View_Changed"/>
         </StackPanel>
 
-        <!-- odcisk A -->
         <Border x:Name="PanelA" Tag="A" Grid.Row="1" Grid.Column="0" Style="{StaticResource Card}" AllowDrop="True"
                 DragEnter="Panel_DragEnter" DragLeave="Panel_DragLeave" Drop="Panel_Drop">
             <DockPanel Margin="12">
@@ -137,7 +133,6 @@
             </DockPanel>
         </Border>
 
-        <!-- odcisk B -->
         <Border x:Name="PanelB" Tag="B" Grid.Row="1" Grid.Column="2" Style="{StaticResource Card}" AllowDrop="True"
                 DragEnter="Panel_DragEnter" DragLeave="Panel_DragLeave" Drop="Panel_Drop">
             <DockPanel Margin="12">
@@ -156,7 +151,6 @@
             </DockPanel>
         </Border>
 
-        <!-- panel boczny: liczba minucji i filtr -->
         <Border Grid.Row="1" Grid.Column="4" Style="{StaticResource Card}">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="14,12">
